@@ -34,8 +34,7 @@ def test_get_eligibility_fixture():
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    # Should return at least one record
-    assert len(data) >= 0
+    assert len(data) > 0
 
 
 def test_pa_list_fixture():

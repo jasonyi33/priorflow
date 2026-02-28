@@ -1,8 +1,8 @@
 """
 Agent 1: Eligibility Checker.
 
-Navigates Stedi (test mode) and/or Claim.MD (test account) to verify
-patient coverage and determine if prior authorization is required.
+Navigates Stedi (test mode) to verify patient coverage and
+determine if prior authorization is required.
 
 Owned by Dev 2.
 """
@@ -18,7 +18,6 @@ from agents.base import (
 )
 from shared.constants import (
     STEDI_URL,
-    CLAIMMD_URL,
     DEFAULT_MAX_STEPS_ELIGIBILITY,
     DEFAULT_MAX_ACTIONS_PER_STEP,
 )
@@ -26,10 +25,6 @@ from shared.constants import (
 load_dotenv()
 
 tools = Tools()
-
-# Track which portal the current run targets so save_eligibility
-# can route to the correct parser.
-_current_portal: str = "stedi"
 
 
 @tools.action("Load patient chart and insurance data")
@@ -48,17 +43,10 @@ async def load_patient(mrn: str) -> ActionResult:
 
 @tools.action("Save eligibility result to output")
 async def save_eligibility(mrn: str, result: str) -> ActionResult:
-    from tools.eligibility_parser import (
-        parse_stedi_response,
-        parse_claimmd_response,
-    )
+    from tools.eligibility_parser import parse_stedi_response
     from tools.db_client import save_eligibility_result
 
-    if _current_portal == "claimmd":
-        parsed = parse_claimmd_response(mrn, result)
-    else:
-        parsed = parse_stedi_response(mrn, result)
-
+    parsed = parse_stedi_response(mrn, result)
     await save_eligibility_result(parsed)
     return ActionResult(
         extracted_content=f"Eligibility saved for {mrn}",
@@ -69,9 +57,6 @@ async def save_eligibility(mrn: str, result: str) -> ActionResult:
 
 async def check_eligibility_stedi(mrn: str):
     """Use Stedi test mode to check eligibility via their web UI."""
-    global _current_portal
-    _current_portal = "stedi"
-
     browser_config = get_browser_config()
     browser = Browser(headless=browser_config["headless"])
 
@@ -99,67 +84,6 @@ async def check_eligibility_stedi(mrn: str):
            - Any service-specific restrictions
         10. Use save_eligibility action with the extracted
             information as a text summary.
-        """,
-        llm=ChatBrowserUse(),
-        browser=browser,
-        tools=tools,
-        sensitive_data=get_sensitive_data(),
-        use_vision=True,
-        max_actions_per_step=DEFAULT_MAX_ACTIONS_PER_STEP,
-    )
-
-    try:
-        history = await agent.run(
-            max_steps=DEFAULT_MAX_STEPS_ELIGIBILITY
-        )
-        if not history.is_done():
-            print(
-                f"Agent did not complete — used all "
-                f"{DEFAULT_MAX_STEPS_ELIGIBILITY} steps"
-            )
-            return None
-        return history.final_result()
-    except Exception as e:
-        print(f"Agent failed for {mrn}: {e}")
-        return None
-
-
-async def check_eligibility_claimmd(mrn: str):
-    """Use Claim.MD test account for eligibility check.
-
-    Claim.MD test account behavior:
-    - Generates rejections/denials based on insured ID value
-    - Returns sample eligibility data for any input
-    """
-    global _current_portal
-    _current_portal = "claimmd"
-
-    browser_config = get_browser_config()
-    browser = Browser(headless=browser_config["headless"])
-
-    agent = Agent(
-        task=f"""
-        You are a healthcare eligibility verification assistant.
-
-        1. Use load_patient action with MRN "{mrn}" to get patient
-           and insurance data.
-        2. Navigate to {CLAIMMD_URL} and log in with test
-           credentials (username: x]claimmd_username[x,
-           password: x]claimmd_password[x).
-        3. Navigate to the eligibility check section.
-        4. Select the appropriate payer.
-        5. Enter the patient's subscriber/member information.
-        6. Submit the eligibility request.
-        7. Parse the response — look for:
-           - Coverage confirmation
-           - Benefit details
-           - Any PA requirements flagged
-           - Rejection codes (if member ID triggers a denial)
-        8. Use save_eligibility action with the parsed response
-           data as a text summary.
-
-        NOTE: The Claim.MD test account generates rejections/denials
-        based on the insured ID value.
         """,
         llm=ChatBrowserUse(),
         browser=browser,

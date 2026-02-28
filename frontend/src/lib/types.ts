@@ -18,7 +18,7 @@ export type PAStatus =
 
 export type AgentType = "eligibility" | "pa_form_filler" | "status_monitor";
 
-export type Portal = "stedi" | "claimmd" | "covermymeds" | "mock";
+export type Portal = "stedi" | "claimmd" | "covermymeds" | "flexpa" | "mock";
 
 export type AlertEventType =
   | "approved"

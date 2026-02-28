@@ -8,7 +8,7 @@ PROTECTED FILE — Only Dev 1 modifies.
 COVERMYMEDS_URL = "https://www.covermymeds.health"
 COVERMYMEDS_KEY_URL = "https://key.covermymeds.com"
 STEDI_URL = "https://www.stedi.com"
-CLAIMMD_URL = "https://www.claim.md"
+FLEXPA_API_URL = "https://api.flexpa.com"
 
 # Server config
 BACKEND_PORT = 8000

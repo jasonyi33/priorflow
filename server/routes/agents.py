@@ -3,12 +3,15 @@ Agent run endpoints — Convex-first with fixture fallback.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 from server.services.convex_client import convex_client
 from server.services import orchestrator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ async def list_agent_runs(
             if data:
                 return data
         except Exception:
-            pass
+            logger.warning("Convex query failed for agentRuns:list", exc_info=True)
 
     fixture_file = FIXTURES_DIR / "agent_run_sample.json"
     if fixture_file.exists():

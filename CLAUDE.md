@@ -4,7 +4,7 @@ AI-powered prior authorization agent that automates healthcare PA workflows usin
 
 ## What This Project Does
 
-Navigates real payer portals (CoverMyMeds, Stedi, Claim.MD) to:
+Navigates real payer portals (CoverMyMeds, Stedi) and pulls supplementary data from Flexpa (FHIR API) to:
 1. Check patient insurance eligibility (Agent 1)
 2. Fill and submit PA forms with clinical justification (Agent 2 — core feature)
 3. Monitor PA determination status and send alerts (Agent 3)
@@ -72,7 +72,7 @@ shared/models.py          # PROTECTED — all Pydantic data contracts
 shared/constants.py       # PROTECTED — portal URLs, timeouts, config
 convex/schema.ts          # PROTECTED — database schema
 agents/
-  eligibility_checker.py  # Agent 1 — Stedi/Claim.MD eligibility
+  eligibility_checker.py  # Agent 1 — Stedi eligibility
   pa_form_filler.py       # Agent 2 — CoverMyMeds PA submission (core demo)
   status_monitor.py       # Agent 3 — status polling + alerts
 tools/                    # Agent helper functions (@tools.action)

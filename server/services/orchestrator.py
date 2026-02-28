@@ -9,6 +9,7 @@ Owned by Dev 1. Skeleton for Phase 1-2 implementation.
 
 import asyncio
 import json
+import logging
 import os
 from datetime import datetime, UTC
 from pathlib import Path
@@ -23,8 +24,11 @@ from shared.constants import (
     AGENT_RUN_TIMEOUT,
 )
 
+logger = logging.getLogger(__name__)
+
 OUTPUT_DIR = Path("output")
 FIXTURES_DIR = Path("data/fixtures")
+CHARTS_DIR = Path("data/charts")
 # Default off for local/test stability. Real agent execution can be enabled explicitly.
 ENABLE_AGENT_EXECUTION = os.getenv("ENABLE_AGENT_EXECUTION", "false").lower() == "true"
 RUN_MAX_STEPS = {
@@ -157,10 +161,28 @@ async def _run_pa_submission(mrn: str, portal: Portal):
 async def _run_status_check(mrn: str, portal: Portal):
     if ENABLE_AGENT_EXECUTION:
         from agents.status_monitor import monitor_covermymeds
-        await monitor_covermymeds(mrn, mrn)
+        patient_name = _lookup_patient_name(mrn)
+        await monitor_covermymeds(mrn, patient_name)
     else:
         await _write_fixture_output(mrn, "status")
     await _persist_output_file(mrn, "status")
+
+
+def _lookup_patient_name(mrn: str) -> str:
+    """Load patient name from chart file. Falls back to MRN if not found."""
+    chart_file = CHARTS_DIR / f"{mrn}.json"
+    if chart_file.exists():
+        try:
+            with open(chart_file) as f:
+                data = json.load(f)
+            patient = data.get("patient", {})
+            first = patient.get("first_name", "")
+            last = patient.get("last_name", "")
+            if first and last:
+                return f"{first} {last}"
+        except Exception:
+            logger.warning("Failed to load patient name from chart %s", mrn, exc_info=True)
+    return mrn
 
 
 async def _persist_run(run: AgentRun):
@@ -186,8 +208,7 @@ async def _persist_run(run: AgentRun):
                 _convex_run_doc_ids[run.id] = str(doc_id)
             return
         except Exception:
-            pass
-    # Fallback: nothing to do (runs tracked in memory only)
+            logger.warning("Failed to persist agent run to Convex", exc_info=True)
 
 
 async def _complete_run(run_id: str, success: bool, error: Optional[str] = None):
@@ -242,7 +263,7 @@ async def _persist_output_file(mrn: str, prefix: str):
             )
             await db_client.save_eligibility_result(result)
         except Exception:
-            pass
+            logger.warning("Failed to persist eligibility output for %s", mrn, exc_info=True)
     elif prefix == "pa_submission":
         path = f"output/pa_submission_{mrn}.json"
         try:
@@ -264,7 +285,7 @@ async def _persist_output_file(mrn: str, prefix: str):
             )
             await db_client.save_pa_request(pa)
         except Exception:
-            pass
+            logger.warning("Failed to persist PA submission output for %s", mrn, exc_info=True)
     elif prefix == "status":
         path = f"output/status_{mrn}.json"
         try:
@@ -282,7 +303,10 @@ async def _persist_output_file(mrn: str, prefix: str):
             )
             await db_client.save_status_update(update)
         except Exception:
-            pass
+            logger.warning(
+                "Failed to persist status output for %s",
+                mrn, exc_info=True,
+            )
 
 
 async def _write_fixture_output(mrn: str, prefix: str):
