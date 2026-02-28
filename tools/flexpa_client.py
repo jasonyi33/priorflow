@@ -12,7 +12,7 @@ Owned by Dev 2.
 
 import os
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 import httpx
 

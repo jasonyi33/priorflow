@@ -149,7 +149,7 @@ def _lookup_patient_name(mrn: str) -> str:
             if first and last:
                 return f"{first} {last}"
         except Exception:
-            pass
+            logger.warning("Failed to load patient name from chart %s", mrn, exc_info=True)
     return mrn
 
 
