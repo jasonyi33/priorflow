@@ -1,0 +1,47 @@
+{
+  "patient": {
+    "name": "Robert Chen",
+    "first_name": "Robert",
+    "last_name": "Chen",
+    "dob": "1972-08-22",
+    "mrn": "MRN-00522"
+  },
+  "insurance": {
+    "payer": "UnitedHealthcare",
+    "member_id": "U987654321",
+    "bin": "610014",
+    "pcn": "OHCP",
+    "rx_group": "UHRX01",
+    "plan_name": "UHC Choice Plus"
+  },
+  "diagnosis": {
+    "icd10": "M54.5",
+    "description": "Low back pain"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "72148",
+    "description": "MRI lumbar spine without contrast"
+  },
+  "prior_therapies": [
+    "Physical therapy x8 weeks (completed 2025-12-15) - limited improvement",
+    "Ibuprofen 800mg TID x6 weeks - insufficient relief",
+    "Cyclobenzaprine 10mg TID x4 weeks - minimal benefit",
+    "Methylprednisolone dose pack (completed 2025-11-20) - transient relief only"
+  ],
+  "labs": {
+    "CBC": "normal (2026-01-08)",
+    "ESR": "12 mm/hr (2026-01-08)",
+    "CRP": "0.8 mg/dL (2026-01-08)"
+  },
+  "imaging": {
+    "xray_lumbar": "degenerative changes L4-L5, mild disc space narrowing (2025-10-20)"
+  },
+  "provider": {
+    "name": "Dr. Michael Torres",
+    "npi": "2345678901",
+    "practice": "Metro Health Orthopedics",
+    "phone": "555-0200",
+    "fax": "555-0201"
+  }
+}

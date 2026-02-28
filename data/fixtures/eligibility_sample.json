@@ -1,0 +1,13 @@
+{
+  "mrn": "MRN-00421",
+  "portal": "stedi",
+  "payer": "Aetna",
+  "coverage_active": true,
+  "copay": "$30 specialist",
+  "deductible": "$1,500 individual / $3,000 family",
+  "out_of_pocket_max": "$6,000 individual",
+  "pa_required": true,
+  "pa_required_reason": "Specialty medication (Humira/adalimumab) requires prior authorization. Step therapy requirement: must have tried and failed at least one conventional DMARD.",
+  "raw_response": "Mock Stedi test mode response - coverage active, specialty tier medication requires PA",
+  "checked_at": "2026-02-28T10:30:00Z"
+}

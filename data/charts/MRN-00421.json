@@ -1,0 +1,56 @@
+{
+  "patient": {
+    "name": "Jane Doe",
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "dob": "1985-03-15",
+    "mrn": "MRN-00421"
+  },
+  "insurance": {
+    "payer": "Aetna",
+    "member_id": "W123456789",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX1234",
+    "plan_name": "Aetna Choice POS II"
+  },
+  "diagnosis": {
+    "icd10": "M06.9",
+    "description": "Rheumatoid arthritis, unspecified"
+  },
+  "medication": {
+    "name": "Humira",
+    "ndc": "00074-4339-02",
+    "dose": "40mg",
+    "frequency": "Every 2 weeks"
+  },
+  "procedure": null,
+  "prior_therapies": [
+    "Methotrexate 15mg weekly x12 weeks (completed 2025-10-01) - inadequate response",
+    "Sulfasalazine 1000mg BID x8 weeks (completed 2025-08-15) - GI intolerance",
+    "Physical therapy x6 weeks (completed 2025-12-01)",
+    "Ibuprofen 800mg TID x4 weeks - insufficient pain relief",
+    "Methylprednisolone dose pack (completed 2025-11-15)"
+  ],
+  "labs": {
+    "CBC": "normal (2026-01-10)",
+    "ESR": "42 mm/hr (2026-01-10) - elevated",
+    "CRP": "3.2 mg/dL (2026-01-10) - elevated",
+    "RF": "positive, 128 IU/mL (2026-01-10)",
+    "Anti-CCP": "positive, >250 U/mL (2026-01-10)",
+    "TB_test": "negative (2026-01-05)",
+    "Hepatitis_B": "negative (2026-01-05)",
+    "LFTs": "normal (2026-01-10)"
+  },
+  "imaging": {
+    "xray_hands": "erosive changes bilateral MCPs, periarticular osteopenia (2025-10-20)",
+    "xray_feet": "marginal erosions bilateral MTPs (2025-10-20)"
+  },
+  "provider": {
+    "name": "Dr. Sarah Smith",
+    "npi": "1234567890",
+    "practice": "Metro Health Rheumatology",
+    "phone": "555-0100",
+    "fax": "555-0101"
+  }
+}

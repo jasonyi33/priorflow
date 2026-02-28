@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment variables (NEVER commit credentials)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+.vercel/
+
+# Convex
+.convex/
+
+# Output (agent-generated files)
+output/*.json
+output/*.gif
+output/*.png
+output/*.mp4
+!output/.gitkeep
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Misc
+*.log

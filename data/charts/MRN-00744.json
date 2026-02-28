@@ -1,0 +1,55 @@
+{
+  "patient": {
+    "name": "David Kim",
+    "first_name": "David",
+    "last_name": "Kim",
+    "dob": "1990-05-28",
+    "mrn": "MRN-00744"
+  },
+  "insurance": {
+    "payer": "Aetna",
+    "member_id": "W555666777",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX5678",
+    "plan_name": "Aetna Open Access HMO"
+  },
+  "diagnosis": {
+    "icd10": "L40.50",
+    "description": "Psoriatic arthritis, unspecified"
+  },
+  "medication": {
+    "name": "Stelara",
+    "ndc": "57894-0060-01",
+    "dose": "45mg",
+    "frequency": "Every 12 weeks (after loading doses)"
+  },
+  "procedure": null,
+  "prior_therapies": [
+    "Methotrexate 20mg weekly x16 weeks (completed 2025-07-15) - hepatotoxicity, LFTs elevated 3x ULN",
+    "Leflunomide 20mg daily x8 weeks (completed 2025-09-20) - persistent diarrhea, discontinued",
+    "Humira 40mg every 2 weeks x24 weeks (completed 2025-12-01) - primary non-response, DAS28 unchanged",
+    "Topical betamethasone 0.05% - ongoing for skin lesions"
+  ],
+  "labs": {
+    "CBC": "normal (2026-01-15)",
+    "ESR": "38 mm/hr (2026-01-15) - elevated",
+    "CRP": "2.8 mg/dL (2026-01-15) - elevated",
+    "LFTs": "normalized after methotrexate discontinuation (2026-01-15)",
+    "TB_test": "negative (2026-01-10)",
+    "Hepatitis_B": "negative (2026-01-10)",
+    "Hepatitis_C": "negative (2026-01-10)"
+  },
+  "imaging": {
+    "xray_hands": "periostitis distal phalanges, pencil-in-cup deformity 3rd DIP (2025-11-01)",
+    "xray_feet": "calcaneal erosions bilateral (2025-11-01)",
+    "xray_sacroiliac": "bilateral sacroiliitis grade 2 (2025-11-01)"
+  },
+  "provider": {
+    "name": "Dr. Lisa Patel",
+    "npi": "4567890123",
+    "practice": "Metro Health Rheumatology",
+    "phone": "555-0400",
+    "fax": "555-0401"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "run-001",
+  "agent_type": "pa_form_filler",
+  "mrn": "MRN-00421",
+  "portal": "covermymeds",
+  "started_at": "2026-02-28T11:00:00Z",
+  "completed_at": "2026-02-28T11:15:00Z",
+  "steps_taken": 28,
+  "max_steps": 40,
+  "success": true,
+  "error_message": null,
+  "gif_path": "output/pa_MRN-00421.gif"
+}

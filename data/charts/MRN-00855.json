@@ -1,0 +1,53 @@
+{
+  "patient": {
+    "name": "Eleanor Johnson",
+    "first_name": "Eleanor",
+    "last_name": "Johnson",
+    "dob": "1948-02-14",
+    "mrn": "MRN-00855"
+  },
+  "insurance": {
+    "payer": "Medicare",
+    "member_id": "1EG4-TE5-MK72",
+    "bin": "004336",
+    "pcn": "MCAID",
+    "rx_group": "MCARE01",
+    "plan_name": "Medicare Part B"
+  },
+  "diagnosis": {
+    "icd10": "G35",
+    "description": "Multiple sclerosis"
+  },
+  "medication": {
+    "name": "Ocrevus",
+    "ndc": "50242-0150-01",
+    "dose": "600mg IV",
+    "frequency": "Every 6 months"
+  },
+  "procedure": null,
+  "prior_therapies": [
+    "Copaxone 40mg SC three times weekly x2 years (completed 2025-06-01) - breakthrough relapses (2 in past year)",
+    "Tecfidera 240mg BID x1 year (completed 2024-06-01) - lymphopenia, discontinued per guidelines",
+    "Physical therapy - ongoing for gait and balance"
+  ],
+  "labs": {
+    "CBC": "WBC 4.2, lymphocytes 1.1 (2026-01-08) - recovered from prior lymphopenia",
+    "LFTs": "normal (2026-01-08)",
+    "Hepatitis_B_surface_antigen": "negative (2026-01-08)",
+    "Hepatitis_B_core_antibody": "negative (2026-01-08)",
+    "JC_virus_antibody": "negative (2026-01-08)",
+    "Immunoglobulins": "IgG 850 mg/dL (normal) (2026-01-08)",
+    "TB_test": "negative (2026-01-05)"
+  },
+  "imaging": {
+    "mri_brain": "multiple periventricular T2/FLAIR lesions, 2 new enhancing lesions compared to prior (2025-12-15)",
+    "mri_cervical_spine": "2 T2 lesions at C3 and C5, stable (2025-12-15)"
+  },
+  "provider": {
+    "name": "Dr. Amanda Brooks",
+    "npi": "5678901234",
+    "practice": "Metro Health Neurology",
+    "phone": "555-0500",
+    "fax": "555-0501"
+  }
+}

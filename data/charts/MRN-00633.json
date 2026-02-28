@@ -1,0 +1,52 @@
+{
+  "patient": {
+    "name": "Maria Santos",
+    "first_name": "Maria",
+    "last_name": "Santos",
+    "dob": "1968-11-03",
+    "mrn": "MRN-00633"
+  },
+  "insurance": {
+    "payer": "BCBS",
+    "member_id": "XYZ789012345",
+    "bin": "003858",
+    "pcn": "A4",
+    "rx_group": "BCBS01",
+    "plan_name": "Blue Cross Blue Shield PPO"
+  },
+  "diagnosis": {
+    "icd10": "M17.11",
+    "description": "Primary osteoarthritis, right knee"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "27447",
+    "description": "Total knee replacement (arthroplasty)"
+  },
+  "prior_therapies": [
+    "Physical therapy x12 weeks (completed 2025-09-30) - reached plateau",
+    "Naproxen 500mg BID x8 weeks - GI side effects, switched",
+    "Celecoxib 200mg daily x12 weeks - partial relief only",
+    "Intra-articular corticosteroid injections x3 (last 2025-11-01) - diminishing returns",
+    "Hyaluronic acid injection series x3 (completed 2025-08-15) - no significant benefit",
+    "Knee brace/assistive device use x6 months"
+  ],
+  "labs": {
+    "CBC": "normal (2026-01-12)",
+    "BMP": "normal (2026-01-12)",
+    "PT_INR": "1.0 (2026-01-12)",
+    "HbA1c": "5.8% (2026-01-12)",
+    "UA": "normal (2026-01-12)"
+  },
+  "imaging": {
+    "xray_right_knee": "severe tricompartmental osteoarthritis, bone-on-bone medial compartment, osteophyte formation, subchondral sclerosis (2025-11-15)",
+    "mri_right_knee": "complete loss of articular cartilage medial compartment, moderate loss lateral, meniscal degeneration (2025-11-20)"
+  },
+  "provider": {
+    "name": "Dr. James Wilson",
+    "npi": "3456789012",
+    "practice": "Metro Health Orthopedic Surgery",
+    "phone": "555-0300",
+    "fax": "555-0301"
+  }
+}

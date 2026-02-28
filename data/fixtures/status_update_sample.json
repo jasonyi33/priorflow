@@ -1,0 +1,10 @@
+{
+  "request_id": "pa-001",
+  "mrn": "MRN-00421",
+  "portal": "covermymeds",
+  "status": "approved",
+  "determination_date": "2026-02-28",
+  "denial_reason": null,
+  "notes": "PA approved for 12-month duration. Refill authorization included.",
+  "checked_at": "2026-02-28T14:30:00Z"
+}
