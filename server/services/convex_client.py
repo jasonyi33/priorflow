@@ -20,25 +20,37 @@ class ConvexClient:
         self.base_url = settings.CONVEX_URL
         self.deploy_key = settings.CONVEX_DEPLOY_KEY
 
+    @property
+    def enabled(self) -> bool:
+        return bool(self.base_url and self.deploy_key)
+
     async def query(self, function_name: str, args: Optional[dict] = None) -> Any:
         """Run a Convex query function.
 
-        TODO: Dev 1 — Implement in Phase 1:
-        POST {CONVEX_URL}/api/query
-        Headers: Authorization: Convex {DEPLOY_KEY}
-        Body: {"path": function_name, "args": args or {}}
+        Raises if Convex is not configured or the request fails.
         """
-        raise NotImplementedError("Convex query not yet implemented")
+        return await self._post("/api/query", function_name, args)
 
     async def mutation(self, function_name: str, args: Optional[dict] = None) -> Any:
         """Run a Convex mutation function.
 
-        TODO: Dev 1 — Implement in Phase 1:
-        POST {CONVEX_URL}/api/mutation
-        Headers: Authorization: Convex {DEPLOY_KEY}
-        Body: {"path": function_name, "args": args or {}}
+        Raises if Convex is not configured or the request fails.
         """
-        raise NotImplementedError("Convex mutation not yet implemented")
+        return await self._post("/api/mutation", function_name, args)
+
+    async def _post(self, path: str, function_name: str, args: Optional[dict]) -> Any:
+        if not self.enabled:
+            raise RuntimeError("Convex not configured")
+
+        payload = {"path": function_name, "args": args or {}}
+        headers = {"Authorization": f"Convex {self.deploy_key}"}
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(f"{self.base_url}{path}", json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            # Convex returns {"value": ...}
+            return data.get("value", data)
 
 
 convex_client = ConvexClient()
