@@ -54,4 +54,4 @@ def test_agents_runs_fixture():
 
 def test_run_polling_endpoint_not_found():
     resp = client.get("/api/agents/runs/does-not-exist")
-    assert resp.status_code in (404, 200)
+    assert resp.status_code == 404

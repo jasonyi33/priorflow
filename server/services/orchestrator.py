@@ -61,7 +61,15 @@ async def dispatch_status_check(mrn: str, portal: Optional[Portal] = None) -> st
 async def dispatch_full_flow(mrn: str) -> dict:
     """Run full chain: eligibility -> optional PA -> optional status monitor."""
     elig_run_id = await dispatch_eligibility(mrn)
-    await wait_for_run(elig_run_id)
+    elig_status = await wait_for_run(elig_run_id)
+
+    if not elig_status or not elig_status.get("success"):
+        return {
+            "eligibility_run_id": elig_run_id,
+            "pa_run_id": None,
+            "status_run_id": None,
+            "pa_required": None,
+        }
 
     pa_required = _read_pa_required(mrn)
     pa_run_id: Optional[str] = None
@@ -302,7 +310,10 @@ async def get_run_status(run_id: str) -> Optional[dict]:
         state = dict(_run_states[run_id])
         if task is not None:
             if task.done() and state["status"] == "started":
-                state["status"] = "completed"
+                exc = task.exception() if not task.cancelled() else None
+                state["status"] = "failed" if exc else "completed"
+                if exc:
+                    state["error_message"] = str(exc)
             state["task_done"] = task.done()
         return state
 
