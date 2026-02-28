@@ -17,7 +17,7 @@ class ConvexClient:
     """Thin wrapper around the Convex HTTP API."""
 
     def __init__(self):
-        self.base_url = settings.CONVEX_URL
+        self.base_url = settings.CONVEX_URL.rstrip("/")
         self.deploy_key = settings.CONVEX_DEPLOY_KEY
 
     @property
@@ -49,6 +49,8 @@ class ConvexClient:
             response = await client.post(f"{self.base_url}{path}", json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
+            if data.get("status") == "error":
+                raise RuntimeError(data.get("errorMessage", "Convex request failed"))
             # Convex returns {"value": ...}
             return data.get("value", data)
 

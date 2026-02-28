@@ -27,7 +27,7 @@ def _load_chart_file(mrn: str) -> dict:
 
 
 def _chart_to_convex_args(chart: PatientChart) -> dict:
-    return {
+    args = {
         "mrn": chart.patient.mrn,
         "firstName": chart.patient.first_name,
         "lastName": chart.patient.last_name,
@@ -74,6 +74,11 @@ def _chart_to_convex_args(chart: PatientChart) -> dict:
         },
         "chartJson": chart.model_dump_json(),
     }
+    if args.get("medication") is None:
+        args.pop("medication")
+    if args.get("procedure") is None:
+        args.pop("procedure")
+    return args
 
 
 @router.get("")

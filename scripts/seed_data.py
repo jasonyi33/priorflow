@@ -51,6 +51,10 @@ async def seed_patients():
             "provider": chart["provider"],
             "chartJson": json.dumps(chart),
         }
+        if args.get("medication") is None:
+            args.pop("medication")
+        if args.get("procedure") is None:
+            args.pop("procedure")
         await convex_client.mutation("patients:create", args)
         print(f"Seeded patient {chart['patient']['mrn']}")
 

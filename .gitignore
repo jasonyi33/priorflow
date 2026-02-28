@@ -37,6 +37,8 @@ out/
 
 # Convex
 .convex/
+convex/_generated/
+frontend/convex/
 
 # Output (agent-generated files)
 output/*.json
