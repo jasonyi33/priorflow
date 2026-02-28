@@ -5,6 +5,12 @@ export const list = query({
   handler: async (ctx) => ctx.db.query("agentRuns").collect(),
 });
 
+export const getByRunId = query({
+  args: { runId: v.string() },
+  handler: async (ctx, args) =>
+    ctx.db.query("agentRuns").withIndex("by_run_id", (q) => q.eq("runId", args.runId)).first(),
+});
+
 export const getByMrn = query({
   args: { mrn: v.string() },
   handler: async (ctx, args) =>
@@ -13,6 +19,7 @@ export const getByMrn = query({
 
 export const create = mutation({
   args: {
+    runId: v.optional(v.string()),
     agentType: v.string(),
     mrn: v.string(),
     portal: v.string(),

@@ -3,7 +3,9 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Support per-developer local overrides without touching tracked files.
+load_dotenv(".env", override=False)
+load_dotenv(".env.local", override=True)
 
 
 class Settings:

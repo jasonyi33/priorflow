@@ -49,3 +49,8 @@ def test_agents_runs_fixture():
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
+
+
+def test_run_polling_endpoint_not_found():
+    resp = client.get("/api/agents/runs/does-not-exist")
+    assert resp.status_code == 404

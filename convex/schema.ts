@@ -89,6 +89,7 @@ export default defineSchema({
     .index("by_mrn_portal", ["mrn", "portal"]),
 
   agentRuns: defineTable({
+    runId: v.optional(v.string()), // external run id used by API polling
     agentType: v.string(), // AgentType enum value
     mrn: v.string(),
     portal: v.string(), // Portal enum value
@@ -100,6 +101,7 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     gifPath: v.optional(v.string()),
   })
+    .index("by_run_id", ["runId"])
     .index("by_mrn", ["mrn"])
     .index("by_agent_type", ["agentType"])
     .index("by_started_at", ["startedAt"]),

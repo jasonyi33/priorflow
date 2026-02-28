@@ -6,9 +6,10 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from server.services.convex_client import convex_client
+from server.services import orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -44,3 +45,21 @@ async def list_agent_runs(
                 return []
             return [data]
     return []
+
+
+@router.get("/runs/{run_id}")
+async def get_agent_run(run_id: str) -> dict:
+    """Poll a specific run by API run_id."""
+    status = await orchestrator.get_run_status(run_id)
+    if status:
+        return status
+
+    if convex_client.enabled:
+        try:
+            item = await convex_client.query("agentRuns:getByRunId", {"runId": run_id})
+            if item:
+                return item
+        except Exception:
+            pass
+
+    raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
