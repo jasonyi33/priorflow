@@ -7,11 +7,14 @@ under data/charts for the demo fixtures.
 """
 
 import json
+import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from shared.models import PatientChart, APIResponse
 from server.services.convex_client import convex_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -83,7 +86,7 @@ async def list_patients() -> list[dict]:
         try:
             return await convex_client.query("patients:list")
         except Exception:
-            pass
+            logger.warning("Convex query failed for patients:list", exc_info=True)
 
     patients: list[dict] = []
     for chart_file in sorted(DATA_DIR.glob("MRN-*.json")):
@@ -101,7 +104,7 @@ async def get_patient(mrn: str) -> dict:
             if patient:
                 return patient
         except Exception:
-            pass
+            logger.warning("Convex query failed for patients:getByMrn", exc_info=True)
     return _load_chart_file(mrn)
 
 
@@ -116,7 +119,7 @@ async def create_patient(chart: PatientChart) -> APIResponse:
         try:
             await convex_client.mutation("patients:create", _chart_to_convex_args(chart))
         except Exception:
-            pass
+            logger.warning("Convex mutation failed for patients:create", exc_info=True)
 
     return APIResponse(
         success=True,

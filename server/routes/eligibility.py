@@ -6,12 +6,15 @@ Falls back to local output/fixtures for demo.
 """
 
 import json
+import logging
 from pathlib import Path
 from fastapi import APIRouter
 
 from shared.models import TriggerEligibilityRequest, APIResponse
 from server.services.convex_client import convex_client
 from server.services import orchestrator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -38,7 +41,7 @@ async def get_eligibility(mrn: str) -> list[dict]:
             if data:
                 return data
         except Exception:
-            pass
+            logger.warning("Convex query failed for eligibilityChecks:getByMrn", exc_info=True)
 
     # Check for agent output file
     output_file = OUTPUT_DIR / f"eligibility_{mrn}.json"

@@ -20,9 +20,10 @@ class Settings:
     # Portal credentials
     CMM_USERNAME: str = os.getenv("CMM_USERNAME", "")
     CMM_PASSWORD: str = os.getenv("CMM_PASSWORD", "")
-    CLAIMMD_USERNAME: str = os.getenv("CLAIMMD_USERNAME", "")
-    CLAIMMD_PASSWORD: str = os.getenv("CLAIMMD_PASSWORD", "")
     STEDI_API_KEY: str = os.getenv("STEDI_API_KEY", "")
+
+    # Flexpa (supplementary FHIR data source)
+    FLEXPA_SECRET_KEY: str = os.getenv("FLEXPA_SECRET_KEY", "")
 
     # Notifications
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")

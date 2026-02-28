@@ -13,7 +13,7 @@ import pytest
 
 from shared.models import EligibilityResult, Portal, AlertPayload
 from tools.chart_loader import load_chart, list_available_charts
-from tools.eligibility_parser import parse_stedi_response, parse_claimmd_response
+from tools.eligibility_parser import parse_stedi_response
 from tools.alert_sender import (
     build_approval_alert,
     build_denial_alert,
@@ -85,14 +85,6 @@ def test_parse_stedi_response():
     assert result.portal == Portal.STEDI
     assert result.mrn == "MRN-00421"
     assert result.raw_response == "Coverage active. Copay $30."
-
-
-def test_parse_claimmd_response():
-    """parse_claimmd_response returns EligibilityResult with Portal.CLAIMMD."""
-    result = parse_claimmd_response("MRN-00421", "Eligibility confirmed.")
-    assert isinstance(result, EligibilityResult)
-    assert result.portal == Portal.CLAIMMD
-    assert result.mrn == "MRN-00421"
 
 
 def test_alert_builders():

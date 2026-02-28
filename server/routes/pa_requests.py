@@ -3,6 +3,7 @@ PA request endpoints — Convex-first with orchestrator dispatch.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException
@@ -10,6 +11,8 @@ from fastapi import APIRouter, HTTPException
 from shared.models import TriggerPARequest, TriggerStatusCheckRequest, APIResponse
 from server.services.convex_client import convex_client
 from server.services import orchestrator
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -41,7 +44,7 @@ async def list_pa_requests(mrn: Optional[str] = None, status: Optional[str] = No
             if data:
                 return data
         except Exception:
-            pass
+            logger.warning("Convex query failed for paRequests", exc_info=True)
 
     results = []
     if mrn:
@@ -73,7 +76,7 @@ async def get_pa_request(request_id: str) -> dict:
                 if str(req.get("_id", "")) == request_id or req.get("id") == request_id:
                     return req
         except Exception:
-            pass
+            logger.warning("Convex query failed for paRequests:list", exc_info=True)
 
     fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
     if fixture_file.exists():

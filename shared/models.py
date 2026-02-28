@@ -37,6 +37,7 @@ class Portal(str, Enum):
     STEDI = "stedi"
     CLAIMMD = "claimmd"
     COVERMYMEDS = "covermymeds"
+    FLEXPA = "flexpa"
     MOCK = "mock"
 
 

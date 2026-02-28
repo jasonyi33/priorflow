@@ -1,6 +1,6 @@
 """
 Eligibility response parser — extracts structured data from
-Stedi and Claim.MD eligibility responses.
+Stedi eligibility responses.
 
 Owned by Dev 2.
 """
@@ -77,43 +77,6 @@ def parse_stedi_response(mrn: str, raw_response: str) -> EligibilityResult:
         copay=copay,
         deductible=deductible,
         out_of_pocket_max=oop_max,
-        pa_required=pa_required,
-        pa_required_reason=pa_reason,
-        raw_response=raw_response,
-        checked_at=datetime.now(UTC),
-    )
-
-
-def parse_claimmd_response(mrn: str, raw_response: str) -> EligibilityResult:
-    """Parse a Claim.MD test account eligibility response."""
-    try:
-        chart = load_chart(mrn)
-        payer = chart.insurance.payer
-    except FileNotFoundError:
-        payer = "Unknown"
-
-    coverage_active = _detect_coverage_active(raw_response)
-    pa_required, pa_reason = _detect_pa_required(raw_response)
-
-    # Claim.MD rejection detection
-    lower = raw_response.lower()
-    if any(kw in lower for kw in ["rejected", "denial", "rejected claim"]):
-        coverage_active = False
-
-    copay = _extract_field(raw_response, [
-        r"copay[:\s]*\$?([\d,.]+[^.\n]*)",
-    ])
-    deductible = _extract_field(raw_response, [
-        r"deductible[:\s]*\$?([\d,.]+[^.\n]*)",
-    ])
-
-    return EligibilityResult(
-        mrn=mrn,
-        portal=Portal.CLAIMMD,
-        payer=payer,
-        coverage_active=coverage_active,
-        copay=copay,
-        deductible=deductible,
         pa_required=pa_required,
         pa_required_reason=pa_reason,
         raw_response=raw_response,

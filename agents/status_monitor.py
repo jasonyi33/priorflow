@@ -1,7 +1,7 @@
 """
 Agent 3: Status Monitor.
 
-Periodically checks PA status across CoverMyMeds and Claim.MD,
+Periodically checks PA status on CoverMyMeds,
 detects status changes, and sends alerts via Agentmail.
 
 Owned by Dev 2.
@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 from agents.base import get_sensitive_data
 from shared.constants import (
     COVERMYMEDS_URL,
-    CLAIMMD_URL,
     DEFAULT_MAX_STEPS_STATUS_MONITOR,
 )
 from shared.models import PAStatusUpdate, PAStatusEnum, Portal
@@ -40,7 +39,6 @@ async def send_alert(
 
     portal_map = {
         "covermymeds": PortalEnum.COVERMYMEDS,
-        "claimmd": PortalEnum.CLAIMMD,
         "stedi": PortalEnum.STEDI,
     }
     portal_enum = portal_map.get(
@@ -83,7 +81,6 @@ async def update_status(
     }
     portal_map = {
         "covermymeds": Portal.COVERMYMEDS,
-        "claimmd": Portal.CLAIMMD,
     }
 
     status_enum = status_map.get(
@@ -142,48 +139,6 @@ async def monitor_covermymeds(mrn: str, patient_name: str):
         sensitive_data=get_sensitive_data(),
         use_vision=True,
         max_actions_per_step=2,
-    )
-
-    try:
-        history = await agent.run(
-            max_steps=DEFAULT_MAX_STEPS_STATUS_MONITOR
-        )
-        if not history.is_done():
-            print(
-                f"Monitor did not complete — used all "
-                f"{DEFAULT_MAX_STEPS_STATUS_MONITOR} steps"
-            )
-            return None
-        return history.final_result()
-    except Exception as e:
-        print(f"Monitor failed for {mrn}: {e}")
-        return None
-
-
-async def monitor_claimmd(mrn: str, patient_name: str):
-    """Check Claim.MD test portal for claim status."""
-    browser = Browser(headless=True)
-
-    agent = Agent(
-        task=f"""
-        Check claim status on Claim.MD test portal.
-
-        1. Navigate to {CLAIMMD_URL} and log in with test
-           credentials (username: x]claimmd_username[x,
-           password: x]claimmd_password[x).
-        2. Find the most recent claim for patient
-           {patient_name}.
-        3. Extract the current status and any response
-           messages.
-        4. Use update_status action with MRN "{mrn}" and
-           portal "claimmd".
-        5. If there are rejection codes, use send_alert
-           with the details.
-        """,
-        llm=ChatBrowserUse(),
-        browser=browser,
-        tools=tools,
-        sensitive_data=get_sensitive_data(),
     )
 
     try:
