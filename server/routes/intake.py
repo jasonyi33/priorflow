@@ -71,7 +71,7 @@ async def intake_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
     shutil.move(str(temp_pdf), final_pdf_path)
 
     extraction_path = save_extraction(mrn, extracted)
-    await _persist_patient_to_convex(chart, patient_created=patient_created)
+    await _persist_patient_to_convex(chart)
 
     background_tasks.add_task(orchestrator.dispatch_full_flow, mrn)
 
@@ -251,10 +251,8 @@ def _set_if(obj: dict[str, Any], path: list[str], value: Any) -> None:
     node[path[-1]] = text
 
 
-async def _persist_patient_to_convex(chart: dict[str, Any], patient_created: bool) -> None:
+async def _persist_patient_to_convex(chart: dict[str, Any]) -> None:
     if not convex_client.enabled:
-        return
-    if not patient_created:
         return
     try:
         chart_model = PatientChart(**chart)
@@ -301,6 +299,6 @@ async def _persist_patient_to_convex(chart: dict[str, Any], patient_created: boo
                 "cpt": chart_model.procedure.cpt,
                 "description": chart_model.procedure.description,
             }
-        await convex_client.mutation("patients:create", args)
+        await convex_client.mutation("patients:upsertByMrn", args)
     except Exception:
-        logger.warning("Failed to persist intake patient to Convex", exc_info=True)
+        logger.warning("Failed to upsert intake patient to Convex", exc_info=True)

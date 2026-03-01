@@ -48,9 +48,9 @@ async def test_persist_patient_to_convex_omits_null_optionals(monkeypatch):
         },
     }
 
-    await intake._persist_patient_to_convex(chart, patient_created=True)
+    await intake._persist_patient_to_convex(chart)
 
     args = captured["args"]
-    assert captured["function_name"] == "patients:create"
+    assert captured["function_name"] == "patients:upsertByMrn"
     assert "planName" not in args["insurance"]
     assert "ndc" not in args["medication"]
