@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Patient } from '../../lib/types';
 import { api } from '../../lib/api';
-import { ChartUploader } from '../components/ChartUploader';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { usePADashboardContext } from '../../lib/hooks';
 import { Search, FileText, Upload, Users, Building2, FileCheck, CalendarDays } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
@@ -16,8 +14,6 @@ export function Patients() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [uploaderOpen, setUploaderOpen] = useState(false);
   const dashData = usePADashboardContext();
 
   useEffect(() => {
@@ -26,21 +22,6 @@ export function Patients() {
       setLoading(false);
     });
   }, []);
-
-  const handlePatientClick = (patient: Patient) => {
-    setSelectedPatient(patient);
-    setUploaderOpen(true);
-  };
-
-  const handleUploadComplete = (chartUrl: string) => {
-    if (selectedPatient) {
-      setPatients(prev =>
-        prev.map(p => p.id === selectedPatient.id ? { ...p, chartUrl } : p)
-      );
-      setSelectedPatient({ ...selectedPatient, chartUrl });
-    }
-    setUploaderOpen(false);
-  };
 
   const filtered = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -55,7 +36,7 @@ export function Patients() {
   const stats = [
     { label: 'Total Patients', value: String(patients.length), sub: 'on record', icon: Users },
     { label: 'Insurers', value: String(insurers), sub: 'distinct payers', icon: Building2 },
-    { label: 'With Charts', value: String(withCharts), sub: `${patients.length - withCharts} pending upload`, icon: FileCheck },
+    { label: 'With Charts', value: String(withCharts), sub: `${patients.length - withCharts} missing chart`, icon: FileCheck },
     { label: 'Added This Week', value: String(recentlyAdded), sub: 'last 7 days', icon: CalendarDays },
   ];
 
@@ -137,8 +118,7 @@ export function Patients() {
                 return (
                   <div
                     key={patient.id}
-                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors cursor-pointer"
-                    onClick={() => handlePatientClick(patient)}
+                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors"
                   >
                     {/* Name + DOB */}
                     <div className="col-span-3 min-w-0">
@@ -181,7 +161,7 @@ export function Patients() {
                       ) : (
                         <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-muted text-muted-foreground border border-border rounded font-semibold">
                           <Upload className="size-2.5" />
-                          UPLOAD
+                          MISSING
                         </span>
                       )}
                     </div>
@@ -193,23 +173,6 @@ export function Patients() {
         </div>
 
       </div>
-
-      {/* Chart upload dialog */}
-      <Dialog open={uploaderOpen} onOpenChange={setUploaderOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Chart — {selectedPatient?.name}</DialogTitle>
-          </DialogHeader>
-          {selectedPatient && (
-            <ChartUploader
-              patientId={selectedPatient.id}
-              patientName={selectedPatient.name}
-              existingChartUrl={selectedPatient.chartUrl}
-              onUploadComplete={handleUploadComplete}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

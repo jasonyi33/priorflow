@@ -1,6 +1,9 @@
+import { ChangeEvent, useRef, useState } from 'react';
 import { usePADashboardContext } from '../../lib/hooks';
 import { PAStatus, PARequest, Patient } from '../../lib/types';
-import { AlertTriangle, Check, X, Info, Clock } from 'lucide-react';
+import { AlertTriangle, Check, X, Info, Clock, Upload, Loader2 } from 'lucide-react';
+import { api } from '../../lib/api';
+import { toast } from 'sonner';
 
 // ─── Status config ───────────────────────────────────────────────────────────
 const PA_STATUS_CONFIG: Record<PAStatus, { label: string; cls: string }> = {
@@ -251,6 +254,35 @@ function NeedsAttention({ requests, patients }: { requests: PARequest[]; patient
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export function Home() {
   const data = usePADashboardContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleDashboardUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+    if (selected.type !== 'application/pdf') {
+      toast.error('Please select a PDF file');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const result = await api.uploadPdfAndStartFlow(selected);
+      toast.success(
+        `Intake started for ${result.mrn} (${result.patientCreated ? 'new patient' : 'updated patient'})`
+      );
+      if (result.missingFields.length > 0) {
+        toast.info(`Missing fields detected: ${result.missingFields.slice(0, 3).join(', ')}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      toast.error(message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   if (data.loading) {
     return (
@@ -297,6 +329,30 @@ export function Home() {
     <div className="flex flex-col relative w-full gap-1 min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 ring-2 ring-pop bg-background">
+        {/* ── Dashboard Intake Upload ── */}
+        <div className="rounded border border-border bg-card px-6 py-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] tracking-[0.18em] text-muted-foreground/55 uppercase mb-1">New Intake</div>
+            <div className="text-sm text-foreground">Upload a chart PDF to create/update patient and start full agent flow.</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handleDashboardUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded border border-border bg-accent hover:bg-accent/80 text-xs font-semibold tracking-wider uppercase disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+              {uploading ? 'Uploading...' : 'Upload PDF'}
+            </button>
+          </div>
+        </div>
 
         {/* ── Stat Bar ── */}
         <div className="grid grid-cols-3 gap-4">

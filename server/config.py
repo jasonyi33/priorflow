@@ -33,6 +33,13 @@ class Settings:
     # Memory (Supermemory)
     SUPERMEMORY_API_KEY: str = os.getenv("SUPERMEMORY_API_KEY", "")
 
+    # MiniMax intake
+    MINIMAX_API_KEY: str = os.getenv("MINIMAX_API_KEY", "")
+    MINIMAX_API_BASE_URL: str = os.getenv("MINIMAX_API_BASE_URL", "https://api.minimax.io")
+    MINIMAX_MODEL: str = os.getenv("MINIMAX_MODEL", "MiniMax-M2")
+    MINIMAX_FILE_PURPOSE: str = os.getenv("MINIMAX_FILE_PURPOSE", "pa_chart_ingestion")
+    MINIMAX_GROUP_ID: str = os.getenv("MINIMAX_GROUP_ID", "")
+
     # Frontend URL (for CORS in production)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "")
 

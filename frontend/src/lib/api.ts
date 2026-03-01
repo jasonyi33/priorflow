@@ -168,10 +168,45 @@ export const api = {
   },
 
   async uploadChart(patientId: string, file: File): Promise<{ success: boolean; chartUrl: string }> {
-    // File upload not yet supported by backend
+    const data = await api.uploadPdfAndStartFlow(file);
     return {
-      success: true,
-      chartUrl: `data/charts/${patientId}.json`,
+      success: data.success,
+      chartUrl: `data/charts/${data.mrn || patientId}.json`,
+    };
+  },
+
+  async uploadPdfAndStartFlow(file: File): Promise<{
+    success: boolean;
+    mrn: string;
+    patientCreated: boolean;
+    patientUpdated: boolean;
+    flowStarted: boolean;
+    missingFields: string[];
+  }> {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE}/intake/pdf`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!res.ok) {
+      let detail = res.statusText;
+      try {
+        const err = await res.json();
+        detail = err?.detail || err?.message || detail;
+      } catch {
+        // keep statusText fallback
+      }
+      throw new Error(`API ${res.status}: ${detail}`);
+    }
+    const payload = await res.json();
+    return {
+      success: !!payload?.success,
+      mrn: payload?.data?.mrn || '',
+      patientCreated: !!payload?.data?.patient_created,
+      patientUpdated: !!payload?.data?.patient_updated,
+      flowStarted: !!payload?.data?.flow_started,
+      missingFields: payload?.data?.missing_fields || [],
     };
   },
 

@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Any
 
 from agents.base import load_chart, save_output, get_sensitive_data
 from server.observability import initialize_laminar
@@ -46,6 +47,7 @@ CLOUD_PROFILE_ID = os.getenv(
 )
 # SDK v2.0.x default base_url is https://api.browser-use.com/api/v2 — do NOT override
 CLOUD_LLM = os.getenv("BROWSER_USE_LLM", "browser-use-2.0")
+EXTRACTION_DIR = Path("output") / "minimax"
 
 
 def _format_phone(raw: str) -> str:
@@ -70,7 +72,27 @@ def _infer_gender(first_name: str) -> str:
     return "Female"  # default fallback
 
 
-def _build_task_prompt(mrn: str, chart: dict) -> str:
+def _load_minimax_extraction(mrn: str) -> dict[str, Any] | None:
+    path = EXTRACTION_DIR / f"{mrn}_extraction.json"
+    if not path.exists():
+        return None
+    try:
+        with path.open() as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _pick(extracted: dict[str, Any] | None, section: str, field: str, fallback: str) -> str:
+    if extracted:
+        value = extracted.get(section, {}).get(field)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return fallback
+
+
+def _build_task_prompt(mrn: str, chart: dict, extracted: dict[str, Any] | None = None) -> str:
     """Build the agent task prompt from chart data."""
     patient = chart["patient"]
     insurance = chart["insurance"]
@@ -78,21 +100,40 @@ def _build_task_prompt(mrn: str, chart: dict) -> str:
     diagnosis = chart["diagnosis"]
     provider = chart["provider"]
 
-    # Split provider name
-    provider_name_parts = provider["name"].replace("Dr. ", "").strip().split(" ", 1)
+    # Prefer MiniMax extraction values for prompt fields.
+    first_name = _pick(extracted, "patient", "first_name", patient["first_name"])
+    last_name = _pick(extracted, "patient", "last_name", patient["last_name"])
+    payer = _pick(extracted, "insurance", "payer", insurance.get("payer", ""))
+    member_id = _pick(extracted, "insurance", "member_id", insurance["member_id"])
+    bin_value = _pick(extracted, "insurance", "bin", insurance["bin"])
+    pcn_value = _pick(extracted, "insurance", "pcn", insurance["pcn"])
+    rx_group = _pick(extracted, "insurance", "rx_group", insurance["rx_group"])
+    diagnosis_code = _pick(extracted, "diagnosis", "icd10", diagnosis["icd10"])
+    diagnosis_desc = _pick(extracted, "diagnosis", "description", diagnosis["description"])
+    med_name = _pick(extracted, "medication", "name", medication.get("name", "Humira"))
+    med_dose = _pick(extracted, "medication", "dose", medication.get("dose", ""))
+    med_quantity = _pick(extracted, "medication", "quantity", "1")
+    med_days_supply = _pick(extracted, "medication", "days_supply", "30")
+    med_dosage_form = _pick(extracted, "medication", "dosage_form", "Kit")
+
+    provider_name = _pick(extracted, "provider", "name", provider["name"])
+    provider_name_parts = provider_name.replace("Dr. ", "").strip().split(" ", 1)
     provider_first = provider_name_parts[0] if provider_name_parts else ""
     provider_last = provider_name_parts[1] if len(provider_name_parts) > 1 else ""
 
     # Format DOB from YYYY-MM-DD to MM/DD/YYYY
-    dob_parts = patient["dob"].split("-")
-    dob_formatted = f"{dob_parts[1]}/{dob_parts[2]}/{dob_parts[0]}" if len(dob_parts) == 3 else patient["dob"]
+    dob_raw = _pick(extracted, "patient", "dob", patient["dob"])
+    dob_parts = dob_raw.split("-")
+    dob_formatted = f"{dob_parts[1]}/{dob_parts[2]}/{dob_parts[0]}" if len(dob_parts) == 3 else dob_raw
 
     # Format phone numbers
-    provider_phone = _format_phone(provider.get("phone", ""))
-    provider_fax = _format_phone(provider.get("fax", ""))
+    provider_phone = _format_phone(_pick(extracted, "provider", "phone", provider.get("phone", "")))
+    provider_fax = _format_phone(_pick(extracted, "provider", "fax", provider.get("fax", "")))
 
     # Infer gender
-    patient_gender = _infer_gender(patient["first_name"])
+    extracted_gender = _pick(extracted, "patient", "gender", "")
+    patient_gender = extracted_gender or _infer_gender(first_name)
+    missing_fields = extracted.get("missing_fields", []) if extracted else []
 
     return f"""
 You are a prior authorization specialist. Submit a PA request on CoverMyMeds.
@@ -114,28 +155,28 @@ Log in if needed (skip if already on dashboard):
 
 ═══ STEP 2: NEW REQUEST ═══
 Click "New Request" on the dashboard. Fill the request creation form:
-  - Medication: "{medication.get('name', 'Humira')}" → select from autocomplete dropdown
-  - Primary Diagnosis: "{diagnosis['icd10']}" → select "{diagnosis['icd10']} - {diagnosis['description']}" from autocomplete, then click "Continue"
-  - Patient: First="{patient['first_name']}", Last="{patient['last_name']}", Gender="{patient_gender}", DOB="{dob_formatted}", Zip="75001"
+  - Medication: "{med_name}" → select from autocomplete dropdown
+  - Primary Diagnosis: "{diagnosis_code}" → select "{diagnosis_code} - {diagnosis_desc}" from autocomplete, then click "Continue"
+  - Patient: First="{first_name}", Last="{last_name}", Gender="{patient_gender}", DOB="{dob_formatted}", Zip="75001"
   - Click "Continue" to advance past patient demographics
-  - Insurance: BIN="{insurance['bin']}", PCN="{insurance['pcn']}", Group="{insurance['rx_group']}"
+  - Insurance: BIN="{bin_value}", PCN="{pcn_value}", Group="{rx_group}"
 
 Wait for forms list. Select the FIRST "CVS Caremark" form you see (button: "Start Request").
 DO NOT click "Show More Forms" — the first CVS Caremark result is correct.
 If an interstitial "medications may be covered" page appears, click "Continue Prior Auth".
 
 ═══ STEP 3: FILL PA FORM — PATIENT SECTION ═══
-  - Member ID: "{insurance['member_id']}"
+  - Member ID: "{member_id}"
   - Street: "123 Main St" (placeholder — data gap)
   - City: "Dallas" (placeholder)
   - State: select "Texas"
   - Zip: "75001"
 
 ═══ STEP 4: FILL PA FORM — DRUG SECTION ═══
-  - Quantity: "1"
-  - Dosage Form: select "Kit" from dropdown (NOT "Pen" — it's not available)
+  - Quantity: "{med_quantity}"
+  - Dosage Form: select "{med_dosage_form}" from dropdown (use closest available option if exact text missing)
   - DAW: select "No"
-  - Days Supply: "30"
+  - Days Supply: "{med_days_supply}"
 
 ═══ STEP 5: FILL PA FORM — PROVIDER SECTION ═══
   - NPI: "{provider['npi']}"
@@ -155,6 +196,11 @@ Click "Send To Prescriber" (NOT "Send To Plan").
   - Select "Email" method → "Continue"
   - Enter prescriber email: abhi.pasam@gmail.com → "Send email"
   - Confirm the email was sent successfully.
+
+Data provenance:
+  - Prefer extracted chart fields from PDF ingestion when available.
+  - Payer hint: "{payer}"
+  - Missing fields from extraction: {", ".join(missing_fields) if missing_fields else "none"}
 """
 
 
@@ -184,8 +230,9 @@ async def fill_covermymeds_pa(mrn: str):
 
     # Pre-load chart data
     chart = load_chart(mrn)
+    extracted = _load_minimax_extraction(mrn)
     sensitive = get_sensitive_data()
-    task_prompt = _build_task_prompt(mrn, chart)
+    task_prompt = _build_task_prompt(mrn, chart, extracted=extracted)
 
     # Create cloud client
     client = AsyncBrowserUse(

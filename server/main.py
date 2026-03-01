@@ -13,7 +13,7 @@ from server.observability import initialize_laminar, shutdown_laminar
 
 initialize_laminar()
 
-from server.routes import patients, eligibility, pa_requests, agents, memory
+from server.routes import patients, eligibility, pa_requests, agents, memory, intake
 
 app = FastAPI(
     title="PriorFlow API",
@@ -39,6 +39,7 @@ app.add_middleware(
 )
 
 app.include_router(patients.router, prefix="/api/patients", tags=["patients"])
+app.include_router(intake.router, prefix="/api/intake", tags=["intake"])
 app.include_router(eligibility.router, prefix="/api/eligibility", tags=["eligibility"])
 app.include_router(pa_requests.router, prefix="/api/pa", tags=["pa_requests"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
