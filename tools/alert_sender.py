@@ -10,9 +10,11 @@ Owned by Dev 2.
 
 import logging
 import os
+import time
 from datetime import datetime, UTC
 from typing import Optional
 
+from agentmail.inboxes.types import CreateInboxRequest
 from shared.models import AlertPayload, Portal
 
 logger = logging.getLogger(__name__)
@@ -85,12 +87,18 @@ def create_pa_inbox(mrn: str) -> Optional[str]:
 
     try:
         inbox = client.inboxes.create(
-            username=f"pa-{mrn.lower()}",
+            request=CreateInboxRequest(
+                username=f"pa-{mrn.lower()}"
+            ),
         )
-        inbox_id = inbox.id if hasattr(inbox, "id") else str(inbox)
-        _pa_inboxes[mrn] = inbox_id
-        logger.info("Created Agentmail inbox for %s: %s", mrn, inbox_id)
-        return inbox_id
+        _pa_inboxes[mrn] = inbox.inbox_id
+        # Brief pause for inbox provisioning
+        time.sleep(1)
+        logger.info(
+            "Created Agentmail inbox for %s: %s",
+            mrn, inbox.inbox_id,
+        )
+        return inbox.inbox_id
     except Exception:
         logger.warning("Failed to create Agentmail inbox for %s", mrn, exc_info=True)
         return None
@@ -151,14 +159,16 @@ def get_pa_email_history(mrn: str) -> list[dict]:
         return []
 
     try:
-        threads = client.inboxes.threads.list(inbox_id=inbox_id)
+        response = client.inboxes.threads.list(
+            inbox_id=inbox_id,
+        )
         result = []
-        for t in threads:
+        for t in response.threads:
             result.append({
-                "thread_id": getattr(t, "id", str(t)),
-                "subject": getattr(t, "subject", ""),
-                "message_count": getattr(t, "message_count", 0),
-                "last_updated": str(getattr(t, "updated_at", "")),
+                "thread_id": t.thread_id,
+                "subject": t.subject or "",
+                "message_count": t.message_count,
+                "last_updated": str(t.updated_at),
             })
         return result
     except Exception:
