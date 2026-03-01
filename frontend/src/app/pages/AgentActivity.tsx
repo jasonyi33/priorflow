@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow, differenceInSeconds } from 'date-fns';
 import { CheckCircle2, XCircle, Loader2, RefreshCw, Activity, ChevronRight, Download } from 'lucide-react';
 import { usePADashboardContext } from '../../lib/hooks';
 import { AgentRun } from '../../lib/types';
 import { getAgentTypeLabel } from '../../lib/dashboard';
-import { TabFocusRail } from '../components/TabFocusRail';
-import { TabFocusSignal, getFocusBucket, useStickyFocusKey } from '../../lib/focusSignals';
 
 type TabKey = 'all' | 'running' | 'completed' | 'failed';
 
@@ -43,75 +41,6 @@ export function AgentActivity() {
   const [refreshing, setRefreshing] = useState(false);
 
   const runs = dashboard.agentRuns;
-  const eventTimestamp = (run: AgentRun): string => run.completedAt || run.startedAt;
-
-  const sortedRuns = useMemo(
-    () =>
-      [...runs].sort(
-        (a, b) => new Date(eventTimestamp(b)).getTime() - new Date(eventTimestamp(a)).getTime()
-      ),
-    [runs]
-  );
-
-  const focusSignalByRunId = useMemo(() => {
-    const map = new Map<string, TabFocusSignal>();
-    for (const run of runs) {
-      if (run.status === 'running') {
-        map.set(run.id, {
-          key: run.id,
-          title: 'Run Currently In Progress',
-          message: `${run.patientName} is actively running ${getAgentTypeLabel(run.type)}.`,
-          timestamp: run.startedAt,
-          severity: 'medium',
-          actionLabel: 'Follow Focus Run',
-        });
-        continue;
-      }
-      if (run.status === 'failed') {
-        map.set(run.id, {
-          key: run.id,
-          title: 'Run Failed - Needs Attention',
-          message: `${run.patientName} encountered a failure in ${getAgentTypeLabel(run.type)}.`,
-          timestamp: eventTimestamp(run),
-          severity: 'high',
-          actionLabel: 'Follow Focus Run',
-        });
-        continue;
-      }
-      map.set(run.id, {
-        key: run.id,
-        title: 'Latest Completed Run',
-        message: `${run.patientName} completed ${getAgentTypeLabel(run.type)} successfully.`,
-        timestamp: eventTimestamp(run),
-        severity: 'low',
-        actionLabel: 'Follow Focus Run',
-      });
-    }
-    return map;
-  }, [runs]);
-
-  const focusCandidate = useMemo(() => {
-    const running = sortedRuns.find((run) => run.status === 'running');
-    if (running) return focusSignalByRunId.get(running.id) || null;
-
-    const failed = sortedRuns.find((run) => run.status === 'failed');
-    if (failed) return focusSignalByRunId.get(failed.id) || null;
-
-    const completed = sortedRuns.find((run) => run.status === 'completed');
-    if (completed) return focusSignalByRunId.get(completed.id) || null;
-
-    const newest = sortedRuns[0];
-    if (!newest) return null;
-    return focusSignalByRunId.get(newest.id) || null;
-  }, [focusSignalByRunId, sortedRuns]);
-
-  const stickyFocusKey = useStickyFocusKey(
-    focusCandidate ? { key: focusCandidate.key, severity: focusCandidate.severity } : null
-  );
-  const activeFocusSignal = (stickyFocusKey && focusSignalByRunId.get(stickyFocusKey)) || focusCandidate;
-  const activeFocusRun = activeFocusSignal
-    ? runs.find((run) => run.id === activeFocusSignal.key)
-    : undefined;
 
   useEffect(() => {
     if (!selectedId && runs.length > 0) {
@@ -149,38 +78,10 @@ export function AgentActivity() {
     setRefreshing(false);
   };
 
-  const scrollToRow = useCallback((key: string, attempt: number = 0) => {
-    const escaped = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const row = document.querySelector(`[data-focus-key="${escaped}"]`) as HTMLElement | null;
-    if (row) {
-      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      return;
-    }
-    if (attempt < 6) {
-      window.setTimeout(() => scrollToRow(key, attempt + 1), 80);
-    }
-  }, []);
-
-  const handleFollowFocus = useCallback(() => {
-    if (!activeFocusRun) return;
-    if (activeFocusRun.status === 'running') setActiveTab('running');
-    else if (activeFocusRun.status === 'failed') setActiveTab('failed');
-    else setActiveTab('completed');
-    setSelectedId(activeFocusRun.id);
-    window.setTimeout(() => scrollToRow(activeFocusRun.id), 50);
-  }, [activeFocusRun, scrollToRow]);
-
   return (
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
-      <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background min-h-0">
-        <TabFocusRail
-          signal={activeFocusSignal}
-          onAction={handleFollowFocus}
-          disabled={!activeFocusRun}
-        />
-
-        <div className="flex-1 flex gap-4 min-h-0">
+      <div className="flex-1 flex gap-4 px-3 lg:px-5 pb-4 bg-background min-h-0">
         <div className="w-[320px] flex-none flex flex-col rounded border border-border bg-card overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
@@ -227,28 +128,14 @@ export function AgentActivity() {
               {listItems.map((run) => (
                 <button
                   key={run.id}
-                  data-focus-key={run.id}
                   onClick={() => setSelectedId(run.id)}
                   className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
-                    selectedId === run.id
-                      ? 'bg-accent/50'
-                      : activeFocusRun?.id === run.id
-                      ? getFocusBucket(activeFocusSignal?.timestamp) === 'hot'
-                        ? 'border-l-2 border-primary bg-primary/10 hover:bg-primary/12'
-                        : 'border-l-2 border-primary/40 bg-primary/5 hover:bg-primary/8'
-                      : 'hover:bg-accent/25'
+                    selectedId === run.id ? 'bg-accent/50' : 'hover:bg-accent/25'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-sm font-semibold truncate flex items-center gap-1.5">
-                        <span className="truncate">{run.patientName}</span>
-                        {activeFocusRun?.id === run.id && (
-                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider">
-                            focus
-                          </span>
-                        )}
-                      </span>
+                      <span className="text-sm font-semibold truncate">{run.patientName}</span>
                       {run.status === 'running' && <Loader2 className="size-3 text-amber-700 animate-spin flex-none" />}
                       {run.status === 'completed' && <CheckCircle2 className="size-3 text-success flex-none" />}
                       {run.status === 'failed' && <XCircle className="size-3 text-destructive flex-none" />}
@@ -365,7 +252,6 @@ export function AgentActivity() {
               </div>
             </>
           )}
-        </div>
         </div>
       </div>
     </div>

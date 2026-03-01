@@ -1,12 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FileCheck, RefreshCw, Search, CheckCircle2, XCircle, Building2, ShieldCheck, ShieldX, Clock3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { formatDistanceToNow } from 'date-fns';
 import { usePADashboardContext } from '../../lib/hooks';
-import { TabFocusRail } from '../components/TabFocusRail';
-import { TabFocusSignal, getFocusBucket, useStickyFocusKey } from '../../lib/focusSignals';
 
 export function Eligibility() {
   const dashboard = usePADashboardContext();
@@ -20,95 +18,6 @@ export function Eligibility() {
   const eligible = results.filter((result) => result.isEligible).length;
   const notEligible = results.filter((result) => !result.isEligible).length;
   const uniqueInsurers = new Set(results.map((result) => result.insuranceProvider)).size;
-  const sortedPatients = useMemo(
-    () =>
-      [...patients].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ),
-    [patients]
-  );
-  const sortedResults = useMemo(
-    () =>
-      [...results].sort(
-        (a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime()
-      ),
-    [results]
-  );
-  const latestResultByPatientId = useMemo(() => {
-    const map = new Map<string, (typeof results)[number]>();
-    for (const result of sortedResults) {
-      if (!map.has(result.patientId)) {
-        map.set(result.patientId, result);
-      }
-    }
-    return map;
-  }, [sortedResults]);
-
-  const focusSignalByPatientId = useMemo(() => {
-    const map = new Map<string, TabFocusSignal>();
-
-    for (const patient of sortedPatients) {
-      const latestResult = latestResultByPatientId.get(patient.id);
-      if (!latestResult) {
-        map.set(patient.id, {
-          key: patient.id,
-          title: 'Eligibility Needed',
-          message: `${patient.name} has no coverage check yet and needs verification.`,
-          timestamp: patient.createdAt,
-          severity: 'high',
-          actionLabel: 'Select Focus Patient',
-        });
-        continue;
-      }
-
-      if (!latestResult.isEligible) {
-        map.set(patient.id, {
-          key: patient.id,
-          title: 'Coverage Issue Detected',
-          message: `${latestResult.patientName} returned an ineligible result and needs follow-up.`,
-          timestamp: latestResult.checkDate,
-          severity: 'high',
-          actionLabel: 'Select Focus Patient',
-        });
-        continue;
-      }
-
-      map.set(patient.id, {
-        key: patient.id,
-        title: 'Latest Eligibility Check',
-        message: `${latestResult.patientName} has the most recent verified eligibility update.`,
-        timestamp: latestResult.checkDate,
-        severity: 'low',
-        actionLabel: 'Select Focus Patient',
-      });
-    }
-
-    return map;
-  }, [latestResultByPatientId, sortedPatients]);
-
-  const focusCandidate = useMemo(() => {
-    const noCheckPatient = sortedPatients.find((patient) => !latestResultByPatientId.has(patient.id));
-    if (noCheckPatient) {
-      return focusSignalByPatientId.get(noCheckPatient.id) || null;
-    }
-
-    const latestIssue = sortedResults.find((result) => !result.isEligible);
-    if (latestIssue) {
-      return focusSignalByPatientId.get(latestIssue.patientId) || null;
-    }
-
-    const latestAny = sortedResults[0];
-    if (!latestAny) return null;
-    return focusSignalByPatientId.get(latestAny.patientId) || null;
-  }, [focusSignalByPatientId, latestResultByPatientId, sortedPatients, sortedResults]);
-
-  const stickyFocusKey = useStickyFocusKey(
-    focusCandidate ? { key: focusCandidate.key, severity: focusCandidate.severity } : null
-  );
-  const activeFocusSignal = (stickyFocusKey && focusSignalByPatientId.get(stickyFocusKey)) || focusCandidate;
-  const activeFocusResult = activeFocusSignal
-    ? latestResultByPatientId.get(activeFocusSignal.key)
-    : undefined;
 
   const insurerBreakdown = useMemo(
     () =>
@@ -149,30 +58,10 @@ export function Eligibility() {
     { label: 'Last Sync', value: dashboard.lastUpdatedAt ? formatDistanceToNow(new Date(dashboard.lastUpdatedAt), { addSuffix: true }) : '—', sub: 'dashboard poll', icon: Clock3, tone: 'text-muted-foreground' },
   ];
 
-  const scrollToRow = useCallback((key: string) => {
-    const escaped = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const row = document.querySelector(`[data-focus-key="${escaped}"]`) as HTMLElement | null;
-    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, []);
-
-  const handleSelectFocus = useCallback(() => {
-    if (!activeFocusSignal) return;
-    setSelectedPatientId(activeFocusSignal.key);
-    if (activeFocusResult) {
-      window.setTimeout(() => scrollToRow(activeFocusResult.id), 50);
-    }
-  }, [activeFocusResult, activeFocusSignal, scrollToRow]);
-
   return (
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
-        <TabFocusRail
-          signal={activeFocusSignal}
-          onAction={handleSelectFocus}
-          disabled={!activeFocusSignal}
-        />
-
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded border border-border bg-card px-5 py-4">
@@ -297,26 +186,9 @@ export function Eligibility() {
             ) : (
               <div className="divide-y divide-border overflow-y-auto">
                 {results.map((result) => (
-                  <div
-                    key={result.id}
-                    data-focus-key={result.id}
-                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors ${
-                      activeFocusResult?.id === result.id
-                        ? getFocusBucket(activeFocusSignal?.timestamp) === 'hot'
-                          ? 'border-l-2 border-primary bg-primary/10 hover:bg-primary/12'
-                          : 'border-l-2 border-primary/40 bg-primary/5 hover:bg-primary/8'
-                        : 'hover:bg-accent/35'
-                    }`}
-                  >
+                  <div key={result.id} className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors">
                     <div className="col-span-2 min-w-0">
-                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
-                        <span className="truncate">{result.patientName}</span>
-                        {activeFocusResult?.id === result.id && (
-                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider">
-                            focus
-                          </span>
-                        )}
-                      </div>
+                      <div className="text-sm font-semibold truncate">{result.patientName}</div>
                     </div>
                     <div className="col-span-3 min-w-0">
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground truncate">
