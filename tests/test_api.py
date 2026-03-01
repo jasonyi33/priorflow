@@ -55,6 +55,18 @@ def test_run_polling_endpoint_not_found():
     assert resp.status_code == 404
 
 
+def test_trigger_eligibility_requires_live_env(monkeypatch):
+    monkeypatch.delenv("BROWSER_USE_API_KEY", raising=False)
+    monkeypatch.delenv("STEDI_EMAIL", raising=False)
+    monkeypatch.delenv("STEDI_PASSWORD", raising=False)
+    resp = client.post(
+        "/api/eligibility/check",
+        json={"mrn": "MRN-00421", "portal": "stedi"},
+    )
+    assert resp.status_code == 400
+    assert "Missing required environment variables" in resp.json().get("detail", "")
+
+
 def test_intake_pdf_creates_patient_and_starts_flow(monkeypatch, tmp_path):
     import server.routes.intake as intake
 

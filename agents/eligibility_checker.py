@@ -7,21 +7,23 @@ determine if prior authorization is required.
 Owned by Dev 2.
 """
 
-from browser_use import Agent, Browser, ChatBrowserUse, Tools, ActionResult
+import os
+from datetime import datetime, UTC
+
+from browser_use_sdk import AsyncBrowserUse
 from dotenv import load_dotenv
-import json
 
 from agents.base import (
     load_chart,
-    get_browser_config,
     get_sensitive_data,
 )
 from shared.constants import (
     STEDI_URL,
     DEFAULT_MAX_STEPS_ELIGIBILITY,
-    DEFAULT_MAX_ACTIONS_PER_STEP,
 )
 from server.observability import initialize_laminar
+from tools.db_client import save_eligibility_result
+from tools.eligibility_parser import parse_stedi_response
 
 try:
     from lmnr import Laminar, observe
@@ -36,35 +38,37 @@ except Exception:  # noqa: BLE001
 
 load_dotenv()
 
-tools = Tools()
+def _build_task_prompt(mrn: str, chart: dict) -> str:
+    patient = chart["patient"]
+    insurance = chart["insurance"]
+    provider = chart["provider"]
+    return f"""
+You are a healthcare eligibility verification assistant.
 
+1. Navigate to {STEDI_URL} and log in:
+   - Email: x]stedi_email[x
+   - Password: x]stedi_password[x
+2. Ensure Test mode is ON.
+3. Create a new eligibility check.
+4. Select payer matching "{insurance['payer']}".
+5. Fill subscriber/patient details:
+   - First name: {patient['first_name']}
+   - Last name: {patient['last_name']}
+   - DOB: {patient['dob']}
+   - Member ID: {insurance['member_id']}
+6. Fill provider details:
+   - Name: {provider['name']}
+   - NPI: {provider['npi']}
+7. Submit the eligibility check.
+8. Extract and return a concise plain-text summary including:
+   - coverage status (active/inactive)
+   - copay
+   - deductible / out-of-pocket
+   - whether prior authorization is required and why
 
-@tools.action("Load patient chart and insurance data")
-async def load_patient(mrn: str) -> ActionResult:
-    chart = load_chart(mrn)
-    return ActionResult(
-        extracted_content=json.dumps(chart, indent=2),
-        long_term_memory=(
-            f"Patient: {chart['patient']['name']}, "
-            f"DOB: {chart['patient']['dob']}, "
-            f"Payer: {chart['insurance']['payer']}, "
-            f"Member ID: {chart['insurance']['member_id']}"
-        ),
-    )
-
-
-@tools.action("Save eligibility result to output")
-async def save_eligibility(mrn: str, result: str) -> ActionResult:
-    from tools.eligibility_parser import parse_stedi_response
-    from tools.db_client import save_eligibility_result
-
-    parsed = parse_stedi_response(mrn, result)
-    await save_eligibility_result(parsed)
-    return ActionResult(
-        extracted_content=f"Eligibility saved for {mrn}",
-        is_done=True,
-        success=True,
-    )
+Use portal values shown on screen. Do not invent details.
+Patient MRN: {mrn}
+"""
 
 
 @observe(
@@ -75,7 +79,7 @@ async def save_eligibility(mrn: str, result: str) -> ActionResult:
     ignore_output=True,
 )
 async def check_eligibility_stedi(mrn: str):
-    """Use Stedi test mode to check eligibility via their web UI."""
+    """Use Browser Use Cloud SDK to check eligibility via Stedi."""
     initialize_laminar()
     if Laminar and Laminar.is_initialized():
         Laminar.set_trace_metadata(
@@ -86,53 +90,81 @@ async def check_eligibility_stedi(mrn: str):
             }
         )
 
-    browser_config = get_browser_config()
-    browser = Browser(headless=browser_config["headless"])
+    if not os.getenv("BROWSER_USE_API_KEY"):
+        raise RuntimeError("BROWSER_USE_API_KEY is not configured")
 
-    agent = Agent(
-        task=f"""
-        You are a healthcare eligibility verification assistant.
+    sensitive = get_sensitive_data()
+    if not sensitive.get("stedi_email") or not sensitive.get("stedi_password"):
+        raise RuntimeError("STEDI_EMAIL/STEDI_PASSWORD are not configured")
 
-        1. Use load_patient action with MRN "{mrn}" to get patient
-           and insurance data.
-        2. Navigate to {STEDI_URL} and log in.
-        3. Make sure "Test mode" is toggled ON.
-        4. Click to create a new eligibility check.
-        5. Select the payer that matches the patient's insurance.
-        6. Fill in the provider information (name, NPI from chart).
-        7. Fill in the subscriber/patient information
-           (name, DOB, member ID).
-           NOTE: In test mode, use predefined mock values if the
-           payer requires specific test data.
-        8. Submit the eligibility check.
-        9. Wait for the response and extract:
-           - Coverage status (active/inactive)
-           - Copay amounts
-           - Deductible information
-           - Whether prior authorization is required
-           - Any service-specific restrictions
-        10. Use save_eligibility action with the extracted
-            information as a text summary.
-        """,
-        llm=ChatBrowserUse(),
-        browser=browser,
-        tools=tools,
-        sensitive_data=get_sensitive_data(),
-        use_vision=True,
-        max_actions_per_step=DEFAULT_MAX_ACTIONS_PER_STEP,
-    )
+    chart = load_chart(mrn)
+    task_prompt = _build_task_prompt(mrn, chart)
+    profile_id = os.getenv("BROWSER_USE_PROFILE_ID") or None
+    llm = os.getenv("BROWSER_USE_LLM", "browser-use-2.0")
+    client = AsyncBrowserUse(api_key=os.getenv("BROWSER_USE_API_KEY"))
+    session_id: str | None = None
 
     try:
-        history = await agent.run(
-            max_steps=DEFAULT_MAX_STEPS_ELIGIBILITY
+        session = await client.sessions.create_session(
+            profile_id=profile_id,
+            start_url=STEDI_URL,
+            keep_alive=True,
         )
-        if not history.is_done():
-            print(
-                f"Agent did not complete — used all "
-                f"{DEFAULT_MAX_STEPS_ELIGIBILITY} steps"
-            )
-            return None
-        return history.final_result()
-    except Exception as e:
-        print(f"Agent failed for {mrn}: {e}")
-        return None
+        session_id = str(session.id)
+        print(f"🌐 Eligibility session: {session.id}")
+        if hasattr(session, "live_url"):
+            print(f"👁️  Live view: {session.live_url}")
+
+        task = await client.tasks.create_task(
+            session_id=session_id,
+            llm=llm,
+            task=task_prompt,
+            start_url=STEDI_URL,
+            max_steps=DEFAULT_MAX_STEPS_ELIGIBILITY,
+            vision=True,
+            flash_mode=True,
+            thinking=True,
+            allowed_domains=["stedi.com"],
+            secrets={
+                "https://*.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
+                "https://www.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
+            },
+            metadata={
+                "agent": "eligibility",
+                "portal": "stedi",
+                "mrn": mrn,
+            },
+            system_prompt_extension=(
+                "Always complete login first. Prefer on-screen values over assumptions. "
+                "Return final summary as plain text, not JSON."
+            ),
+        )
+
+        async for step in task.stream(interval=2):
+            step_num = getattr(step, "number", "?")
+            goal = getattr(step, "next_goal", getattr(step, "status", ""))
+            url = getattr(step, "url", "")
+            print(f"   📍 Step {step_num}: {goal} ({url})")
+
+        result = await client.tasks.get_task(task.id)
+        if not getattr(result, "is_success", False):
+            status = getattr(result, "status", "unknown")
+            raise RuntimeError(f"Eligibility task failed with status: {status}")
+
+        raw_summary = str(getattr(result, "output", "") or "").strip()
+        if not raw_summary:
+            raise RuntimeError("Eligibility task completed without output")
+
+        parsed = parse_stedi_response(mrn, raw_summary)
+        await save_eligibility_result(parsed)
+        return parsed.model_dump(mode="json")
+    finally:
+        if session_id:
+            try:
+                await client.sessions.update_session(session_id, action="stop")
+            except Exception:
+                pass
+        try:
+            await client.close()
+        except Exception:
+            pass

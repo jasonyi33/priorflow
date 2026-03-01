@@ -7,8 +7,9 @@ Falls back to local output/fixtures for demo.
 
 import json
 import logging
+import os
 from pathlib import Path
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from shared.models import TriggerEligibilityRequest, APIResponse
 from server.services.convex_client import convex_client
@@ -24,6 +25,17 @@ OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 
 @router.post("/check")
 async def trigger_eligibility_check(req: TriggerEligibilityRequest) -> APIResponse:
+    missing = [
+        key
+        for key in ("BROWSER_USE_API_KEY", "STEDI_EMAIL", "STEDI_PASSWORD")
+        if not os.getenv(key, "").strip()
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required environment variables for live eligibility: {', '.join(missing)}",
+        )
+
     run_id = await orchestrator.dispatch_eligibility(req.mrn, req.portal)
     return APIResponse(
         success=True,
