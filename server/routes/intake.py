@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import shutil
+import time as _time
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
@@ -36,7 +38,10 @@ async def intake_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
         shutil.copyfileobj(file.file, f)
 
     try:
-        extracted = extract_pdf_to_pa_fields(temp_pdf)
+        t0 = _time.monotonic()
+        logger.info("Starting PDF extraction for %s", temp_pdf.name)
+        extracted = await asyncio.to_thread(extract_pdf_to_pa_fields, temp_pdf)
+        logger.info("PDF extraction completed in %.1fs", _time.monotonic() - t0)
     except MiniMaxClientError as exc:
         temp_pdf.unlink(missing_ok=True)
         raise HTTPException(status_code=502, detail=f"MiniMax extraction failed: {exc}") from exc
