@@ -21,7 +21,7 @@ export default function Footer() {
               <li><a href="#workflow" className="text-sm hover:text-primary transition-colors">How_It_Works</a></li>
               <li><a href="#features" className="text-sm hover:text-primary transition-colors">Features</a></li>
               <li><a href="#pricing" className="text-sm hover:text-primary transition-colors">Pricing</a></li>
-              <li><a href="http://localhost:5173/signin" className="text-sm hover:text-primary transition-colors">Dashboard</a></li>
+              <li><a href="/signin" className="text-sm hover:text-primary transition-colors">Dashboard</a></li>
             </ul>
           </div>
         </div>
