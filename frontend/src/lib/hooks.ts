@@ -224,7 +224,10 @@ export function usePADashboard(): PADashboardData {
         setLoading(false);
       }
     } catch {
-      // Silently retry on next interval
+      // API unreachable — stop loading so dashboard renders with empty state
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
