@@ -367,6 +367,17 @@ export const api = {
     }).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   },
 
+  async getAgentRunsByMrn(mrn: string): Promise<AgentRun[]> {
+    const encoded = encodeURIComponent(mrn);
+    const data = await fetchJSON<any[]>(`/agents/runs?mrn=${encoded}`);
+    const patients = await getCachedPatients();
+    return data.map(item => {
+      const run = toAgentRun(item);
+      run.patientName = getPatientName(patients, run.patientId);
+      return run;
+    }).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  },
+
   async getAgentRun(id: string): Promise<AgentRun | undefined> {
     try {
       const data = await fetchJSON<any>(`/agents/runs/${id}`);
