@@ -24,6 +24,13 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ─── Transformers: backend shapes → frontend types ───
 
+function toISOString(value: unknown): string {
+  if (!value) return new Date().toISOString();
+  if (typeof value === 'number') return new Date(value).toISOString();
+  const d = new Date(value as string);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 function toPatient(chart: any): Patient {
   // Backend returns full PatientChart objects with nested structure
   if (chart.patient) {
@@ -35,7 +42,7 @@ function toPatient(chart: any): Patient {
       memberId: chart.insurance.member_id,
       insuranceProvider: chart.insurance.payer,
       chartUrl: `${API_BASE}/patients/${mrn}`,
-      createdAt: chart.created_at || chart.createdAt || new Date().toISOString(),
+      createdAt: toISOString(chart.created_at || chart.createdAt),
       providerName: chart.provider?.name,
       providerNpi: chart.provider?.npi,
       practiceName: chart.provider?.practice,
@@ -80,7 +87,7 @@ function toEligibilityResult(data: any, patientName?: string): EligibilityResult
     patientName: patientName || data.mrn,
     isEligible: data.coverage_active,
     coverageDetails: details || undefined,
-    checkDate: data.checked_at || new Date().toISOString(),
+    checkDate: toISOString(data.checked_at),
     insuranceProvider: data.payer,
   };
 }
@@ -102,8 +109,8 @@ function toPARequest(data: any): PARequest {
     procedureCode: data.diagnosis?.icd10 || '',
     procedureName: data.medication_or_procedure || '',
     status: PA_STATUS_MAP[data.status] || 'pending',
-    submittedAt: data.created_at,
-    lastUpdated: data.updated_at || data.created_at,
+    submittedAt: toISOString(data.created_at),
+    lastUpdated: toISOString(data.updated_at || data.created_at),
     agentRunId: data.run_id || data.runId || undefined,
     denialReason: data.gaps_detected?.length ? data.gaps_detected.join(', ') : undefined,
     approvalCode: data.submission_id,
@@ -147,8 +154,8 @@ function toAgentRun(data: any): AgentRun {
     status,
     patientId: data.mrn,
     patientName: data.mrn,
-    startedAt: data.started_at || data.startedAt,
-    completedAt: data.completed_at || data.completedAt || undefined,
+    startedAt: toISOString(data.started_at || data.startedAt),
+    completedAt: (data.completed_at || data.completedAt) ? toISOString(data.completed_at || data.completedAt) : undefined,
     logs,
     result,
   };
