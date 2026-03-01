@@ -13,8 +13,8 @@ import { buildDemoSnapshot } from './demoData';
 
 const POLL_INTERVAL_MS = 5000;
 const DEMO_DATA_ENABLED = import.meta.env.VITE_ENABLE_DEMO_DATA !== 'false';
-const MIN_DEMO_PATIENTS = 6;
-const MIN_DEMO_ELIGIBILITY = 6;
+const MIN_DEMO_PATIENTS = 7;
+const MIN_DEMO_ELIGIBILITY = 7;
 const MIN_DEMO_PA_REQUESTS = 7;
 const MIN_DEMO_AGENT_RUNS = 7;
 
