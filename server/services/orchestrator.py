@@ -137,6 +137,13 @@ _convex_run_doc_ids: dict[str, str] = {}
 _pa_results: dict[str, dict] = {}  # mrn -> PA submission output
 
 
+def _is_live_execution(agent_type: AgentType) -> bool:
+    # Eligibility is always a real live agent run.
+    if agent_type == AgentType.ELIGIBILITY:
+        return True
+    return ENABLE_AGENT_EXECUTION
+
+
 def _log_step(run_id: str, message: str):
     """Append a timestamped log entry to a run's activity log."""
     state = _run_states.get(run_id)
@@ -167,6 +174,7 @@ async def _start_run(run_id: str, agent_type: AgentType, mrn: str, portal: Porta
         "mrn": mrn,
         "portal": portal.value,
         "status": "started",
+        "execution_mode": "live" if _is_live_execution(agent_type) else "fixture",
         "started_at": run.started_at.isoformat(),
         "completed_at": None,
         "success": None,
@@ -193,7 +201,7 @@ async def _run_with_retry(run_id: str, agent_type: AgentType, mrn: str, portal: 
                 "component": "orchestrator",
                 "agent_type": agent_type.value,
                 "portal": portal.value,
-                "execution_mode": "live" if ENABLE_AGENT_EXECUTION else "fixture",
+                "execution_mode": "live" if _is_live_execution(agent_type) else "fixture",
             }
         )
     attempt = 0
@@ -227,13 +235,18 @@ async def _run_eligibility(mrn: str, portal: Portal):
     run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "eligibility" and s["status"] in ("started", "retrying")), None)
     if run_id:
         _log_step(run_id, "Loading patient chart data")
-    if ENABLE_AGENT_EXECUTION:
+    if _is_live_execution(AgentType.ELIGIBILITY):
         from agents.eligibility_checker import check_eligibility_stedi
         if run_id:
             _log_step(run_id, "Connecting to Stedi eligibility API")
-        await check_eligibility_stedi(mrn)
+        result = await check_eligibility_stedi(mrn)
+        if not result:
+            raise RuntimeError(f"Eligibility agent returned empty result for {mrn}")
         if run_id:
             _log_step(run_id, "Eligibility response received — parsing results")
+        output_file = OUTPUT_DIR / f"eligibility_{mrn}.json"
+        if not output_file.exists():
+            raise RuntimeError(f"Eligibility output file was not created for {mrn}")
     else:
         if run_id:
             _log_step(run_id, "Using fixture data (ENABLE_AGENT_EXECUTION=false)")
