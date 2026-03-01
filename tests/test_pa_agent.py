@@ -287,6 +287,28 @@ async def test_save_status_update_updates_existing_pa_request(tmp_path, monkeypa
 # Phase 3: Reliability + multi-MRN tests
 # ──────────────────────────────────────────────────────────────
 
+def test_build_submission_alert():
+    """Verify build_submission_alert produces a valid AlertPayload."""
+    from tools.alert_sender import build_submission_alert
+    from shared.models import Portal
+
+    alert = build_submission_alert(
+        patient_name="Alex Morgan",
+        mrn="MRN-00421",
+        portal=Portal.COVERMYMEDS,
+        medication="Humira 40mg",
+        fields_filled=16,
+        gaps_detected=2,
+    )
+    assert alert.event_type == "submitted"
+    assert alert.mrn == "MRN-00421"
+    assert alert.patient_name == "Alex Morgan"
+    assert alert.portal == Portal.COVERMYMEDS
+    assert "Humira 40mg" in alert.details
+    assert "16 fields filled" in alert.details
+    assert "2 gaps detected" in alert.details
+
+
 def test_phone_formatting():
     """Verify phone numbers are formatted to XXX-XXX-XXXX."""
     from agents.pa_form_filler import _format_phone

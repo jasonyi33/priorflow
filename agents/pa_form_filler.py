@@ -321,6 +321,7 @@ async def _post_process(mrn: str, chart: dict, cloud_result) -> dict:
     from tools.justification_gen import generate_justification as gen_justification
     from shared.models import PARequest, PAStatusEnum, Portal
     from tools.db_client import save_pa_request
+    from tools.alert_sender import send_pa_alert, build_submission_alert
 
     # Generate clinical justification
     chart_pydantic = load_chart_pydantic(mrn)
@@ -365,6 +366,28 @@ async def _post_process(mrn: str, chart: dict, cloud_result) -> dict:
         status=PAStatusEnum.SUBMITTED.value,
         justification=narrative,
     )
+
+    # Send submission notification email
+    patient = chart.get("patient", {})
+    patient_name = (
+        f"{patient.get('first_name', '')} "
+        f"{patient.get('last_name', '')}"
+    ).strip() or mrn
+    try:
+        alert = build_submission_alert(
+            patient_name=patient_name,
+            mrn=mrn,
+            portal=Portal.COVERMYMEDS,
+            medication=f"{med_name} {med_dose}".strip(),
+            fields_filled=len(fields_filled),
+            gaps_detected=len(gaps_detected),
+        )
+        await send_pa_alert(alert)
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "Failed to send submission alert for %s",
+            mrn, exc_info=True,
+        )
 
     submission = {
         "mrn": mrn,

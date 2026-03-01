@@ -216,3 +216,24 @@ def build_delay_alert(
         ),
         timestamp=datetime.now(UTC),
     )
+
+
+def build_submission_alert(
+    patient_name: str,
+    mrn: str,
+    portal: Portal,
+    medication: str,
+    fields_filled: int = 0,
+    gaps_detected: int = 0,
+) -> AlertPayload:
+    return AlertPayload(
+        patient_name=patient_name,
+        mrn=mrn,
+        event_type="submitted",
+        portal=portal,
+        details=(
+            f"PA submitted for {medication}. "
+            f"{fields_filled} fields filled, {gaps_detected} gaps detected."
+        ),
+        timestamp=datetime.now(UTC),
+    )
