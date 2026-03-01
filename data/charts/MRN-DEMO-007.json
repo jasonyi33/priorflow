@@ -1,0 +1,38 @@
+{
+  "patient": {
+    "name": "Patient 07",
+    "first_name": "Patient",
+    "last_name": "07",
+    "dob": "1987-10-10",
+    "mrn": "MRN-DEMO-007"
+  },
+  "insurance": {
+    "payer": "Kaiser Permanente",
+    "member_id": "MEM-0007",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 07"
+  },
+  "diagnosis": {
+    "icd10": "L20.9",
+    "description": "Atopic dermatitis, unspecified"
+  },
+  "medication": {
+    "name": "Dupixent",
+    "dose": "300mg",
+    "frequency": "Every 2 weeks",
+    "ndc": null
+  },
+  "procedure": null,
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 07",
+    "npi": "7890123456",
+    "practice": "Practice 07",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

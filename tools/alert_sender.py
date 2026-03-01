@@ -84,10 +84,19 @@ def create_pa_inbox(mrn: str) -> Optional[str]:
         return _pa_inboxes[mrn]
 
     try:
-        inbox = client.inboxes.create(
-            username=f"pa-{mrn.lower()}",
-        )
-        inbox_id = inbox.id if hasattr(inbox, "id") else str(inbox)
+        # Check if inbox already exists by trying to get it
+        username = f"pa-{mrn.lower()}"
+        inbox_address = f"{username}@agentmail.to"
+        try:
+            client.inboxes.get(inbox_id=inbox_address)
+            _pa_inboxes[mrn] = inbox_address
+            logger.info("Found existing Agentmail inbox for %s: %s", mrn, inbox_address)
+            return inbox_address
+        except Exception:
+            pass
+
+        inbox = client.inboxes.create(username=username)
+        inbox_id = inbox.inbox_id
         _pa_inboxes[mrn] = inbox_id
         logger.info("Created Agentmail inbox for %s: %s", mrn, inbox_id)
         return inbox_id
@@ -126,12 +135,16 @@ async def send_pa_alert(payload: AlertPayload) -> bool:
         )
         body = _build_email_body(payload)
 
-        client.inboxes.messages.send(
+        sent = client.inboxes.messages.send(
             inbox_id=inbox_id,
             to=NOTIFICATION_RECIPIENT,
             subject=subject,
             text=body,
         )
+
+        # Track thread for future replies
+        if hasattr(sent, "thread_id") and sent.thread_id:
+            _pa_threads[payload.mrn] = sent.thread_id
 
         logger.info("Agentmail alert sent for %s", payload.mrn)
         return True
@@ -151,14 +164,16 @@ def get_pa_email_history(mrn: str) -> list[dict]:
         return []
 
     try:
-        threads = client.inboxes.threads.list(inbox_id=inbox_id)
+        response = client.inboxes.threads.list(inbox_id=inbox_id)
+        threads = response.threads if hasattr(response, "threads") else []
         result = []
         for t in threads:
             result.append({
-                "thread_id": getattr(t, "id", str(t)),
+                "thread_id": getattr(t, "thread_id", str(t)),
                 "subject": getattr(t, "subject", ""),
+                "preview": getattr(t, "preview", ""),
                 "message_count": getattr(t, "message_count", 0),
-                "last_updated": str(getattr(t, "updated_at", "")),
+                "last_updated": str(getattr(t, "timestamp", getattr(t, "updated_at", ""))),
             })
         return result
     except Exception:

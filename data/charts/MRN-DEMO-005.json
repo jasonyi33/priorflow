@@ -1,0 +1,36 @@
+{
+  "patient": {
+    "name": "Patient 05",
+    "first_name": "Patient",
+    "last_name": "05",
+    "dob": "1983-01-24",
+    "mrn": "MRN-DEMO-005"
+  },
+  "insurance": {
+    "payer": "Humana",
+    "member_id": "MEM-0005",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 05"
+  },
+  "diagnosis": {
+    "icd10": "G47.33",
+    "description": "Obstructive sleep apnea"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "95810",
+    "description": "Diagnostic sleep study"
+  },
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 05",
+    "npi": "5678901234",
+    "practice": "Practice 05",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

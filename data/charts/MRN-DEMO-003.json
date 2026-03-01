@@ -1,0 +1,38 @@
+{
+  "patient": {
+    "name": "Patient 03",
+    "first_name": "Patient",
+    "last_name": "03",
+    "dob": "1991-12-19",
+    "mrn": "MRN-DEMO-003"
+  },
+  "insurance": {
+    "payer": "Blue Cross Blue Shield",
+    "member_id": "MEM-0003",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 03"
+  },
+  "diagnosis": {
+    "icd10": "G43.909",
+    "description": "Migraine, unspecified"
+  },
+  "medication": {
+    "name": "Aimovig",
+    "dose": "140mg",
+    "frequency": "Monthly",
+    "ndc": null
+  },
+  "procedure": null,
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 03",
+    "npi": "3456789012",
+    "practice": "Practice 03",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

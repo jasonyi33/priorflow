@@ -1,0 +1,36 @@
+{
+  "patient": {
+    "name": "Patient 04",
+    "first_name": "Patient",
+    "last_name": "04",
+    "dob": "1969-06-08",
+    "mrn": "MRN-DEMO-004"
+  },
+  "insurance": {
+    "payer": "Cigna",
+    "member_id": "MEM-0004",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 04"
+  },
+  "diagnosis": {
+    "icd10": "R00.0",
+    "description": "Tachycardia, unspecified"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "93015",
+    "description": "Cardiovascular stress test"
+  },
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 04",
+    "npi": "4567890123",
+    "practice": "Practice 04",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

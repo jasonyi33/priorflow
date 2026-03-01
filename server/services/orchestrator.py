@@ -30,6 +30,7 @@ from shared.models import AgentType, Portal, AgentRun, EligibilityResult, PARequ
 from server.observability import initialize_laminar
 from server.services.convex_client import convex_client
 from tools import db_client
+from tools.alert_sender import send_pa_alert, build_approval_alert, build_denial_alert, build_delay_alert, create_pa_inbox
 from shared.constants import (
     MAX_AGENT_RETRIES,
     RETRY_BACKOFF_BASE,
@@ -466,6 +467,8 @@ async def _persist_output_file(mrn: str, prefix: str):
                 updated_at=now,
             )
             await db_client.save_pa_request(pa)
+            # Send Agentmail alert for PA submission
+            await _send_pa_submission_alert(mrn, data)
         except Exception:
             logger.warning("Failed to persist PA submission output for %s", mrn, exc_info=True)
     elif prefix == "status":
@@ -484,11 +487,51 @@ async def _persist_output_file(mrn: str, prefix: str):
                 checked_at=datetime.now(UTC),
             )
             await db_client.save_status_update(update)
+            # Send Agentmail alert for status changes
+            await _send_status_alert(mrn, data)
         except Exception:
             logger.warning(
                 "Failed to persist status output for %s",
                 mrn, exc_info=True,
             )
+
+async def _send_pa_submission_alert(mrn: str, data: dict):
+    """Send an Agentmail alert when a PA submission completes."""
+    try:
+        patient_name = _lookup_patient_name(mrn)
+        create_pa_inbox(mrn)
+        med_or_proc = data.get("medication_or_procedure", "")
+        submission_id = data.get("submission_id", "")
+        from shared.models import AlertPayload
+        payload = AlertPayload(
+            patient_name=patient_name,
+            mrn=mrn,
+            event_type="submitted",
+            portal=Portal.COVERMYMEDS,
+            details=f"PA submitted for {med_or_proc}. Submission ID: {submission_id}".strip(),
+            timestamp=datetime.now(UTC),
+        )
+        await send_pa_alert(payload)
+    except Exception:
+        logger.warning("Failed to send PA submission alert for %s", mrn, exc_info=True)
+
+
+async def _send_status_alert(mrn: str, data: dict):
+    """Send an Agentmail alert when a status update is detected."""
+    try:
+        patient_name = _lookup_patient_name(mrn)
+        status = str(data.get("status", "")).lower()
+        notes = data.get("notes", "")
+        denial_reason = data.get("denial_reason", "")
+        if status == "approved":
+            payload = build_approval_alert(patient_name, mrn, Portal.COVERMYMEDS, notes)
+        elif status == "denied":
+            payload = build_denial_alert(patient_name, mrn, Portal.COVERMYMEDS, denial_reason or notes)
+        else:
+            return
+        await send_pa_alert(payload)
+    except Exception:
+        logger.warning("Failed to send status alert for %s", mrn, exc_info=True)
 
 
 async def _write_fixture_output(mrn: str, prefix: str):

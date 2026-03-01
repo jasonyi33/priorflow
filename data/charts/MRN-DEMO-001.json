@@ -1,0 +1,38 @@
+{
+  "patient": {
+    "name": "Patient 01",
+    "first_name": "Patient",
+    "last_name": "01",
+    "dob": "1988-04-12",
+    "mrn": "MRN-DEMO-001"
+  },
+  "insurance": {
+    "payer": "Aetna",
+    "member_id": "MEM-0001",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 01"
+  },
+  "diagnosis": {
+    "icd10": "L40.0",
+    "description": "Psoriasis vulgaris"
+  },
+  "medication": {
+    "name": "Skyrizi",
+    "dose": "150mg",
+    "frequency": "Every 12 weeks",
+    "ndc": null
+  },
+  "procedure": null,
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 01",
+    "npi": "1234567890",
+    "practice": "Practice 01",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

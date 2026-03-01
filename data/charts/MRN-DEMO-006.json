@@ -1,0 +1,36 @@
+{
+  "patient": {
+    "name": "Patient 06",
+    "first_name": "Patient",
+    "last_name": "06",
+    "dob": "1994-11-29",
+    "mrn": "MRN-DEMO-006"
+  },
+  "insurance": {
+    "payer": "Molina Healthcare",
+    "member_id": "MEM-0006",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 06"
+  },
+  "diagnosis": {
+    "icd10": "K21.0",
+    "description": "Gastro-esophageal reflux disease with esophagitis"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "43239",
+    "description": "Upper GI endoscopy with biopsy"
+  },
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 06",
+    "npi": "6789012345",
+    "practice": "Practice 06",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}

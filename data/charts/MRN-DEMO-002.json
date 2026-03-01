@@ -1,0 +1,36 @@
+{
+  "patient": {
+    "name": "Patient 02",
+    "first_name": "Patient",
+    "last_name": "02",
+    "dob": "1976-09-03",
+    "mrn": "MRN-DEMO-002"
+  },
+  "insurance": {
+    "payer": "UnitedHealthcare",
+    "member_id": "MEM-0002",
+    "bin": "004336",
+    "pcn": "ADV",
+    "rx_group": "RX0000",
+    "plan_name": "Plan 02"
+  },
+  "diagnosis": {
+    "icd10": "M54.5",
+    "description": "Low back pain"
+  },
+  "medication": null,
+  "procedure": {
+    "cpt": "72148",
+    "description": "MRI lumbar spine without contrast"
+  },
+  "prior_therapies": [],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Provider 02",
+    "npi": "2345678901",
+    "practice": "Practice 02",
+    "phone": "555-000-0000",
+    "fax": "555-000-0001"
+  }
+}
