@@ -32,60 +32,49 @@ async def trigger_pa_submission(req: TriggerPARequest) -> APIResponse:
 
 @router.get("")
 async def list_pa_requests(mrn: Optional[str] = None, status: Optional[str] = None) -> list[dict]:
-    # Convex first
-    if convex_client.enabled:
-        try:
-            if mrn:
-                data = await convex_client.query("paRequests:getByMrn", {"mrn": mrn})
-            elif status:
-                data = await convex_client.query("paRequests:getByStatus", {"status": status})
-            else:
-                data = await convex_client.query("paRequests:list")
-            if data:
-                return data
-        except Exception:
-            logger.warning("Convex query failed for paRequests", exc_info=True)
+    results: list[dict] = []
+    seen_keys: set[tuple[str, str]] = set()
 
-    results = []
-    seen_mrns: set[str] = set()
+    def append_result(item: dict):
+        item_mrn = item.get("mrn", "")
+        item_portal = item.get("portal", "")
+        if mrn and item_mrn != mrn:
+            return
+        if status and item.get("status") != status:
+            return
+        key = (item_mrn, item_portal)
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        results.append(item)
 
     # 1. In-memory PA results from orchestrator (most up-to-date)
-    for pa_mrn, pa_data in orchestrator._pa_results.items():
-        if mrn and pa_mrn != mrn:
-            continue
-        if status and pa_data.get("status") != status:
-            continue
-        seen_mrns.add(pa_mrn)
-        results.append(pa_data)
+    for pa_data in orchestrator._pa_results.values():
+        append_result(pa_data)
 
-    # 2. Scan output directory for pa_submission_*.json files
+    # 2. Local output fallback/overlay for direct script runs
     for output_file in sorted(OUTPUT_DIR.glob("pa_submission_*.json"), reverse=True):
         try:
             with open(output_file) as f:
-                data = json.load(f)
-            file_mrn = data.get("mrn", "")
-            if file_mrn in seen_mrns:
-                continue
-            seen_mrns.add(file_mrn)
-            if mrn and file_mrn != mrn:
-                continue
-            if status and data.get("status") != status:
-                continue
-            results.append(data)
+                append_result(json.load(f))
         except Exception:
             logger.warning("Failed to read %s", output_file, exc_info=True)
 
-    # 3. Fixture fallback only if nothing found
+    # 3. Convex for persisted requests across processes
+    if convex_client.enabled:
+        try:
+            data = await convex_client.query("paRequests:list")
+            for item in data or []:
+                append_result(item)
+        except Exception:
+            logger.warning("Convex query failed for paRequests", exc_info=True)
+
+    # 4. Fixture fallback only if nothing found
     if not results:
         fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
         if fixture_file.exists():
             with open(fixture_file) as f:
-                data = json.load(f)
-                if mrn and data.get("mrn") != mrn:
-                    return []
-                if status and data.get("status") != status:
-                    return []
-                results.append(data)
+                append_result(json.load(f))
 
     return results
 

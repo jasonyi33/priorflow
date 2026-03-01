@@ -8,6 +8,7 @@ import pytest
 import json
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from tools.justification_gen import generate_justification
 from tools.chart_loader import load_chart
 from tools.form_mapper import PA_FORM_FIELDS, NEW_REQUEST_FIELDS, KNOWN_GAPS_MRN_00421
@@ -213,6 +214,7 @@ def test_save_pa_request_creates_file(tmp_path, monkeypatch):
     import tools.db_client as db_client
 
     monkeypatch.setattr(db_client, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(db_client, "convex_client", SimpleNamespace(enabled=False))
 
     now = datetime.now(timezone.utc)
     pa = PARequest(
@@ -238,6 +240,47 @@ def test_save_pa_request_creates_file(tmp_path, monkeypatch):
     assert data["portal"] == "covermymeds"
     assert len(data["fields_filled"]) == 2
     assert data["justification_summary"] == "Test justification narrative"
+
+
+@pytest.mark.asyncio
+async def test_save_status_update_updates_existing_pa_request(tmp_path, monkeypatch):
+    """Status updates should advance the same PA request entry used by the UI."""
+    from datetime import datetime, timedelta, timezone
+    from shared.models import PARequest, PAStatusEnum, PAStatusUpdate, Portal
+    import tools.db_client as db_client
+
+    monkeypatch.setattr(db_client, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(db_client, "convex_client", SimpleNamespace(enabled=False))
+
+    created_at = datetime.now(timezone.utc)
+    request = PARequest(
+        mrn="MRN-TEST",
+        portal=Portal.COVERMYMEDS,
+        medication_or_procedure="Humira 40mg",
+        status=PAStatusEnum.SUBMITTED,
+        fields_filled=["patient_first_name"],
+        gaps_detected=[],
+        created_at=created_at,
+        updated_at=created_at,
+    )
+    await db_client.save_pa_request(request)
+
+    status_update = PAStatusUpdate(
+        request_id="pa-MRN-TEST",
+        mrn="MRN-TEST",
+        portal=Portal.COVERMYMEDS,
+        status=PAStatusEnum.APPROVED,
+        checked_at=created_at + timedelta(minutes=5),
+    )
+    await db_client.save_status_update(status_update)
+
+    output_file = tmp_path / "pa_submission_MRN-TEST.json"
+    with open(output_file) as f:
+        data = json.load(f)
+
+    assert data["mrn"] == "MRN-TEST"
+    assert data["status"] == "approved"
+    assert data["medication_or_procedure"] == "Humira 40mg"
 
 
 # ──────────────────────────────────────────────────────────────
