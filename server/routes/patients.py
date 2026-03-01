@@ -86,12 +86,14 @@ def _chart_to_convex_args(chart: PatientChart) -> dict:
 
 @router.get("")
 async def list_patients() -> list[dict]:
-    """List all patients from Convex, falling back to fixture files."""
+    """List all patients from Convex, falling back to fixture files only in local mode."""
     if convex_client.enabled:
         try:
             return await convex_client.query("patients:list")
         except Exception:
             logger.warning("Convex query failed for patients:list", exc_info=True)
+            # In deployed/live mode, avoid mixing in local fixture patients.
+            return []
 
     patients: list[dict] = []
     for chart_file in sorted(DATA_DIR.glob("MRN-*.json")):
@@ -108,8 +110,12 @@ async def get_patient(mrn: str) -> dict:
             patient = await convex_client.query("patients:getByMrn", {"mrn": mrn})
             if patient:
                 return patient
+            raise HTTPException(status_code=404, detail=f"Patient {mrn} not found")
+        except HTTPException:
+            raise
         except Exception:
             logger.warning("Convex query failed for patients:getByMrn", exc_info=True)
+            raise HTTPException(status_code=502, detail="Patient lookup failed")
     return _load_chart_file(mrn)
 
 

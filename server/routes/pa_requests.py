@@ -69,8 +69,8 @@ async def list_pa_requests(mrn: Optional[str] = None, status: Optional[str] = No
         except Exception:
             logger.warning("Convex query failed for paRequests", exc_info=True)
 
-    # 4. Fixture fallback only if nothing found
-    if not results:
+    # 4. Fixture fallback only in local demo mode
+    if not results and not convex_client.enabled:
         fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
         if fixture_file.exists():
             with open(fixture_file) as f:
@@ -89,6 +89,9 @@ async def get_pa_request(request_id: str) -> dict:
                     return req
         except Exception:
             logger.warning("Convex query failed for paRequests:list", exc_info=True)
+
+    if convex_client.enabled:
+        raise HTTPException(status_code=404, detail=f"PA request {request_id} not found")
 
     fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
     if fixture_file.exists():

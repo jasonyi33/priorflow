@@ -54,6 +54,8 @@ async def get_eligibility(mrn: str) -> list[dict]:
                 return data
         except Exception:
             logger.warning("Convex query failed for eligibilityChecks:getByMrn", exc_info=True)
+            # In deployed/live mode, avoid mixing in local fixtures when Convex is configured.
+            return []
 
     # Check for agent output file
     output_file = OUTPUT_DIR / f"eligibility_{mrn}.json"
@@ -61,8 +63,8 @@ async def get_eligibility(mrn: str) -> list[dict]:
         with open(output_file) as f:
             return [json.load(f)]
 
-    # Fall back to fixture
-    if mrn == "MRN-00421":
+    # Fall back to fixture only when Convex is not configured (local demo mode).
+    if not convex_client.enabled and mrn == "MRN-00421":
         fixture_file = FIXTURES_DIR / "eligibility_sample.json"
         if fixture_file.exists():
             with open(fixture_file) as f:
