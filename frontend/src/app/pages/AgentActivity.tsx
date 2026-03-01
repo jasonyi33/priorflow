@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router';
 import { formatDistanceToNow, differenceInSeconds } from 'date-fns';
 import { CheckCircle2, XCircle, Loader2, RefreshCw, Activity, ChevronRight, Download } from 'lucide-react';
 import { usePADashboardContext } from '../../lib/hooks';
@@ -37,30 +36,15 @@ function StatusBadge({ status }: { status: AgentRun['status'] }) {
 
 export function AgentActivity() {
   const dashboard = usePADashboardContext();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const mrnFilter = searchParams.get('mrn')?.trim() || '';
-  const runs = useMemo(
-    () => (mrnFilter ? dashboard.agentRuns.filter((run) => run.patientId === mrnFilter) : dashboard.agentRuns),
-    [dashboard.agentRuns, mrnFilter]
-  );
-
-  const clearMrnFilter = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete('mrn');
-    setSearchParams(next);
-  };
+  const runs = dashboard.agentRuns;
 
   useEffect(() => {
     if (!selectedId && runs.length > 0) {
       setSelectedId(runs[0].id);
-      return;
-    }
-    if (selectedId && !runs.some((run) => run.id === selectedId)) {
-      setSelectedId(runs[0]?.id || null);
     }
   }, [runs, selectedId]);
 
@@ -113,18 +97,6 @@ export function AgentActivity() {
               <RefreshCw className={`size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
-
-          {mrnFilter && (
-            <div className="px-4 py-2 text-[10px] border-b border-border bg-accent/50 flex items-center justify-between gap-2">
-              <span className="uppercase tracking-widest text-muted-foreground/70">Filtered by MRN {mrnFilter}</span>
-              <button
-                onClick={clearMrnFilter}
-                className="uppercase tracking-wider text-muted-foreground hover:text-foreground"
-              >
-                Clear
-              </button>
-            </div>
-          )}
 
           <div className="flex border-b border-border">
             {tabs.map((tab) => (

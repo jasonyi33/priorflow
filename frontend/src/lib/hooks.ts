@@ -12,7 +12,7 @@ import { AgentRun, ApiHealth, EligibilityResult, PARequest, Patient } from './ty
 import { buildDemoSnapshot } from './demoData';
 
 const POLL_INTERVAL_MS = 5000;
-const DEMO_DATA_ENABLED = String(import.meta.env.VITE_ENABLE_DEMO_DATA || '').toLowerCase() === 'true';
+const DEMO_DATA_ENABLED = import.meta.env.VITE_ENABLE_DEMO_DATA !== 'false';
 const MIN_DEMO_PATIENTS = 6;
 const MIN_DEMO_ELIGIBILITY = 6;
 const MIN_DEMO_PA_REQUESTS = 7;
