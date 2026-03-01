@@ -40,7 +40,7 @@ async def test_save_eligibility_result_omits_none_optionals(monkeypatch):
 
     await db_client.save_eligibility_result(result)
 
-    assert captured["function_name"] == "eligibilityChecks:create"
+    assert captured["function_name"] == "eligibilityChecks:upsert"
     args = captured["args"]
     assert isinstance(args, dict)
     assert "copay" not in args

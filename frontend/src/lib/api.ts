@@ -190,6 +190,15 @@ function getPatientName(patients: Patient[], mrn: string): string {
   return patients.find(p => p.id === mrn)?.name || mrn;
 }
 
+function deduplicateByPatient(results: EligibilityResult[]): EligibilityResult[] {
+  const seen = new Set<string>();
+  return results.filter((r) => {
+    if (seen.has(r.patientId)) return false;
+    seen.add(r.patientId);
+    return true;
+  });
+}
+
 // ─── API ───
 
 export const api = {
@@ -276,9 +285,10 @@ export const api = {
     // Prefer direct list endpoint so eligibility can render even when patients table is sparse.
     try {
       const data = await fetchJSON<any[]>('/eligibility');
-      return data
+      const sorted = data
         .map((item) => toEligibilityResult(item, getPatientName(patients, item.mrn)))
         .sort((a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime());
+      return deduplicateByPatient(sorted);
     } catch {
       // Backward-compatible fallback for older backends without /eligibility list.
       const results: EligibilityResult[] = [];
@@ -294,9 +304,10 @@ export const api = {
       });
 
       await Promise.all(fetches);
-      return results.sort(
+      const sorted = results.sort(
         (a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime()
       );
+      return deduplicateByPatient(sorted);
     }
   },
 
