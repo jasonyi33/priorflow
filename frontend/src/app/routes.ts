@@ -6,9 +6,12 @@ import { Eligibility } from './pages/Eligibility';
 import { PARequests } from './pages/PARequests';
 import { AgentActivity } from './pages/AgentActivity';
 import { MockPortal } from './pages/MockPortal';
+import { Settings } from './pages/Settings';
+import { SignIn } from './pages/SignIn';
 import { NotFound } from './pages/NotFound';
 
 export const router = createBrowserRouter([
+  { path: '/signin', Component: SignIn },
   {
     path: '/',
     Component: Layout,
@@ -19,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'pa-requests', Component: PARequests },
       { path: 'agent-activity', Component: AgentActivity },
       { path: 'mock-portal', Component: MockPortal },
+      { path: 'settings', Component: Settings },
       { path: '*', Component: NotFound },
     ],
   },

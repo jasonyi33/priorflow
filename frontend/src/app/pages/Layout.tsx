@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { 
   LayoutDashboard, 
   Users, 
@@ -7,9 +7,13 @@ import {
   ClipboardList, 
   Activity, 
   Lock,
+  Globe,
   Menu,
   X,
   ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   LogOut,
   CircleCheck,
@@ -30,7 +34,7 @@ const navigation = [
   { name: 'ELIGIBILITY', href: '/eligibility', icon: FileCheck },
   { name: 'PA REQUESTS', href: '/pa-requests', icon: ClipboardList },
   { name: 'AGENT ACTIVITY', href: '/agent-activity', icon: Activity },
-  { name: 'MOCK PORTAL', href: '/mock-portal', icon: Lock, locked: true },
+  { name: 'MOCK PORTAL', href: '/mock-portal', icon: Globe },
 ];
 
 // ─── NOTIFICATION DATA ───
@@ -141,8 +145,10 @@ function getPriorityBadge(priority: Notification['priority']) {
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const dashboardData = usePADashboard();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -153,6 +159,16 @@ export function Layout() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); navigate('/pa-requests'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); navigate('/eligibility'); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [navigate]);
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -197,13 +213,20 @@ export function Layout() {
   // SIDEBAR CONTENT
   // ═══════════════════════════════════════════════
   const SidebarContent = () => (
-    <div className="flex h-full flex-col p-3 gap-3">
-      {/* Brand */}
-      <div className="flex items-center gap-2.5 px-1 pt-1 pb-2">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <PriorFlowLogo className="size-6" />
+    <div className="flex h-full flex-col p-2 gap-2">
+      {/* Brand + Collapse toggle */}
+      <div className="flex items-center gap-2 px-1 pt-1 pb-1">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <PriorFlowLogo className="size-5" />
         </div>
-        <span className="text-lg font-['Inter',sans-serif] font-bold tracking-tight">PriorFlow</span>
+        <span className="flex-1 text-base font-bold tracking-tight">PriorFlow</span>
+        <button
+          onClick={() => setSidebarCollapsed(true)}
+          className="flex items-center justify-center size-7 rounded text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="size-3.5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -236,52 +259,18 @@ export function Layout() {
         })}
       </nav>
 
-      {/* Quick Stats — derived from live data */}
-      <div className="mt-1">
-        <p className="px-2.5 pb-1.5 pt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
-          TODAY
-        </p>
-        <div className="grid grid-cols-2 gap-1.5">
-          {dashboardData.loading
-            ? [...Array(4)].map((_, i) => (
-                <div key={i} className="rounded-md border border-border/40 bg-muted/50 p-2.5 h-16 animate-pulse" />
-              ))
-            : sidebarStats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div
-                    key={stat.label}
-                    className="rounded-md border border-border/60 bg-accent/50 p-2.5 flex flex-col gap-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className={cn('size-6 rounded flex items-center justify-center', stat.bgColor)}>
-                        <Icon className={cn('size-3.5', stat.color)} />
-                      </div>
-                      <span className="text-lg font-['Inter',sans-serif] font-bold tracking-tight leading-none">
-                        {stat.value}
-                      </span>
-                    </div>
-                    <span className="text-[9px] tracking-wider text-muted-foreground/60 uppercase">
-                      {stat.label}
-                    </span>
-                  </div>
-                );
-              })}
-        </div>
-      </div>
-
       {/* Quick Actions */}
       <div className="mt-1">
         <p className="px-2.5 pb-1.5 pt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
           QUICK ACTIONS
         </p>
         <div className="space-y-0.5">
-          <button className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button onClick={() => navigate('/pa-requests')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
             <ClipboardList className="size-4" />
             <span className="flex-1 text-left">NEW PA REQUEST</span>
-            <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘N</span>
+            <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘K</span>
           </button>
-          <button className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button onClick={() => navigate('/eligibility')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
             <FileCheck className="size-4" />
             <span className="flex-1 text-left">CHECK ELIGIBILITY</span>
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘E</span>
@@ -291,32 +280,6 @@ export function Layout() {
 
       {/* Spacer */}
       <div className="flex-1" />
-
-      {/* System Status — derived from live data */}
-      <div className={cn(
-        'rounded-md border px-2.5 py-2 flex items-center gap-2',
-        dashboardData.loading
-          ? 'border-border bg-muted/50'
-          : dashboardData.apiUptime >= 99
-            ? 'border-success/20 bg-success/5'
-            : 'border-warning/20 bg-warning/5'
-      )}>
-        {!dashboardData.loading && (
-          <>
-            <span className="relative flex size-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-              <span className="relative inline-flex rounded-full size-2 bg-success" />
-            </span>
-            <span className="text-[10px] tracking-wider text-success uppercase font-semibold flex-1">
-              ALL SYSTEMS ONLINE
-            </span>
-            <span className="text-[9px] text-muted-foreground/50">{dashboardData.apiUptime}%</span>
-          </>
-        )}
-        {dashboardData.loading && (
-          <span className="text-[10px] text-muted-foreground/50 tracking-wider">LOADING...</span>
-        )}
-      </div>
 
       {/* User Section */}
       <div className="relative">
@@ -343,12 +306,12 @@ export function Layout() {
         {/* User dropdown */}
         {userMenuOpen && (
           <div className="absolute bottom-full left-0 right-0 mb-1 rounded-md border border-border bg-card shadow-lg overflow-hidden z-10">
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+            <button onClick={() => { setUserMenuOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
               <Settings className="size-3.5" />
               SETTINGS
             </button>
             <div className="border-t border-border" />
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-destructive/70 hover:bg-destructive/5 hover:text-destructive transition-colors">
+            <button onClick={() => { setUserMenuOpen(false); navigate('/signin'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-destructive/70 hover:bg-destructive/5 hover:text-destructive transition-colors">
               <LogOut className="size-3.5" />
               SIGN OUT
             </button>
@@ -357,10 +320,37 @@ export function Layout() {
       </div>
 
       {/* Version */}
-      <div className="px-2.5 pb-1 flex items-center justify-between">
+      <div className="px-2 pb-1">
         <span className="text-[9px] text-muted-foreground/30 tracking-wider">PRIORFLOW v2.4.1</span>
-        <span className="text-[9px] text-muted-foreground/30 tracking-wider">HIPAA</span>
       </div>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════
+  // COLLAPSED SIDEBAR (icon strip)
+  // ═══════════════════════════════════════════════
+  const CollapsedSidebar = () => (
+    <div className="flex flex-col items-center py-2 gap-1.5">
+      {/* Expand button at top */}
+      <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
+        className="flex items-center justify-center size-8 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition-colors mb-1">
+        <PanelLeftOpen className="size-4" />
+      </button>
+      {navigation.map((item) => {
+        const isActive = location.pathname === item.href;
+        const Icon = item.icon;
+        return (
+          <Link key={item.name} to={item.href} title={item.name}
+            className={cn(
+              'flex items-center justify-center size-8 rounded-md transition-colors',
+              isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground',
+              item.locked && 'pointer-events-none opacity-30'
+            )}
+          >
+            <Icon className="size-4" />
+          </Link>
+        );
+      })}
     </div>
   );
 
@@ -370,22 +360,19 @@ export function Layout() {
   const WidgetSection = () => (
     <div className="w-full aspect-[2] relative overflow-hidden rounded-lg border border-border bg-card">
       <TVNoise opacity={0.3} intensity={0.2} speed={40} />
-      <div className="bg-accent/30 flex-1 flex flex-col justify-between text-sm font-medium uppercase relative z-20 p-4 h-full">
-        <div className="flex justify-between items-center">
-          <span className="opacity-50">{dateInfo.dayOfWeek}</span>
+      <div className="bg-accent/30 flex-1 flex flex-col justify-between relative z-20 px-3 pt-3 pb-6 h-full">
+        <div className="flex justify-between items-center text-[10px] font-medium uppercase opacity-60">
+          <span>{dateInfo.dayOfWeek}</span>
           <span>{dateInfo.restOfDate}</span>
         </div>
         <div className="text-center">
-          <div className="text-5xl font-['Inter',sans-serif] font-bold tracking-tight" suppressHydrationWarning>
+          <div className="text-5xl font-bold tracking-tight" suppressHydrationWarning>
             {formatTime(currentTime)}
           </div>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center text-[10px] font-medium uppercase mt-3">
           <span className="opacity-50">{dashboardData.queueDepth} queued</span>
-          <span>{widgetData.location}</span>
-          <span className="px-2 py-0.5 text-xs bg-accent rounded font-medium">
-            {widgetData.timezone}
-          </span>
+          <span className="opacity-50">{widgetData.timezone}</span>
         </div>
 
         {/* Background grid pattern */}
@@ -406,7 +393,7 @@ export function Layout() {
   const NotificationItem = ({ notification }: { notification: Notification }) => (
     <div
       className={cn(
-        'group p-3 rounded-lg border transition-all duration-200 hover:shadow-sm',
+        'group p-2.5 rounded-lg border transition-all duration-200 hover:shadow-sm',
         !notification.read && 'cursor-pointer',
         notification.read
           ? 'bg-card/50 border-border/30'
@@ -414,29 +401,32 @@ export function Layout() {
       )}
       onClick={() => { if (!notification.read) markAsRead(notification.id); }}
     >
-      <div className="flex items-start gap-3">
-        <div className={cn('w-2 h-2 rounded-full mt-2 flex-shrink-0', getTypeColor(notification.type))} />
+      <div className="flex items-start gap-2.5">
+        <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', getTypeColor(notification.type))} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <h4 className={cn('text-sm font-medium truncate', !notification.read && 'font-semibold')}>
-                {notification.title}
-              </h4>
+          {/* Title — full width, no truncation */}
+          <h4 className={cn('text-sm leading-snug mb-1', !notification.read ? 'font-semibold' : 'font-medium')}>
+            {notification.title}
+          </h4>
+          {/* Message clamped to 1 line */}
+          <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">
+            {notification.message}
+          </p>
+          {/* Badge + timestamp + clear on one row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
               {getPriorityBadge(notification.priority)}
+              <span className="text-[10px] text-muted-foreground/50">
+                {formatTimestamp(notification.timestamp)}
+              </span>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-destructive"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive"
             >
               clear
             </button>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {notification.message}
-          </p>
-          <span className="text-xs text-muted-foreground/60 mt-1 block">
-            {formatTimestamp(notification.timestamp)}
-          </span>
         </div>
       </div>
     </div>
@@ -621,10 +611,9 @@ export function Layout() {
   // RIGHT PANEL
   // ═══════════════════════════════════════════════
   const RightPanel = () => (
-    <div className="flex flex-col h-full gap-gap py-sides min-h-screen max-h-screen sticky top-0 overflow-clip">
+    <div className="flex flex-col h-screen sticky top-0 overflow-hidden px-3 py-sides gap-3">
       <WidgetSection />
       <NotificationsSection />
-      <ChatSection />
     </div>
   );
 
@@ -633,7 +622,7 @@ export function Layout() {
   // ═══════════════════════════════════════════════
   return (
     <PADashboardContext.Provider value={dashboardData}>
-      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-gap lg:px-sides">
+      <div className="flex w-full min-h-screen">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div 
@@ -643,9 +632,12 @@ export function Layout() {
         )}
 
         {/* Left Sidebar - Desktop */}
-        <aside className="hidden lg:block col-span-2 top-0 relative">
-          <div className="sticky top-0 py-sides min-h-screen max-h-screen overflow-auto rounded-lg border border-border bg-card">
-            <SidebarContent />
+        <aside className={cn(
+          'hidden lg:flex flex-col flex-none sticky top-0 h-screen bg-card border-r border-border overflow-hidden transition-[width] duration-200 ease-in-out',
+          sidebarCollapsed ? 'w-14' : 'w-52'
+        )}>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+            {sidebarCollapsed ? <CollapsedSidebar /> : <SidebarContent />}
           </div>
         </aside>
 
@@ -670,17 +662,17 @@ export function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <PriorFlowMark className="size-5 text-primary" />
-            <span className="text-xs font-semibold tracking-wider font-['Inter',sans-serif]">PriorFlow</span>
+            <span className="text-xs font-semibold tracking-wider">PriorFlow</span>
           </div>
         </header>
 
         {/* Main content */}
-        <div className="col-span-1 lg:col-span-7 pt-12 lg:pt-0">
+        <div className="flex-1 min-w-0 pt-12 lg:pt-0">
           <Outlet />
         </div>
 
         {/* Right Panel - Desktop only */}
-        <div className="col-span-3 hidden lg:block">
+        <div className="hidden lg:block w-[300px] flex-none border-l border-border">
           <RightPanel />
         </div>
       </div>
