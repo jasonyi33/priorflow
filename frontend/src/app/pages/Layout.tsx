@@ -29,12 +29,12 @@ import { usePADashboard, PADashboardContext } from '../../lib/hooks';
 
 // ─── NAVIGATION DATA ───
 const navigation = [
-  { name: 'DASHBOARD', href: '/app', icon: LayoutDashboard },
-  { name: 'PATIENTS', href: '/app/patients', icon: Users },
-  { name: 'ELIGIBILITY', href: '/app/eligibility', icon: FileCheck },
-  { name: 'PA REQUESTS', href: '/app/pa-requests', icon: ClipboardList },
-  { name: 'AGENT ACTIVITY', href: '/app/agent-activity', icon: Activity },
-  { name: 'MOCK PORTAL', href: '/app/mock-portal', icon: Globe },
+  { name: 'DASHBOARD', href: '/', icon: LayoutDashboard },
+  { name: 'PATIENTS', href: '/patients', icon: Users },
+  { name: 'ELIGIBILITY', href: '/eligibility', icon: FileCheck },
+  { name: 'PA REQUESTS', href: '/pa-requests', icon: ClipboardList },
+  { name: 'AGENT ACTIVITY', href: '/agent-activity', icon: Activity },
+  { name: 'MOCK PORTAL', href: '/mock-portal', icon: Globe },
 ];
 
 // ─── NOTIFICATION DATA ───
@@ -163,8 +163,8 @@ export function Layout() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); navigate('/app/pa-requests'); }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); navigate('/app/eligibility'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); navigate('/pa-requests'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); navigate('/eligibility'); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -265,12 +265,12 @@ export function Layout() {
           QUICK ACTIONS
         </p>
         <div className="space-y-0.5">
-          <button onClick={() => navigate('/app/pa-requests')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button onClick={() => navigate('/pa-requests')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
             <ClipboardList className="size-4" />
             <span className="flex-1 text-left">NEW PA REQUEST</span>
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘K</span>
           </button>
-          <button onClick={() => navigate('/app/eligibility')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button onClick={() => navigate('/eligibility')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
             <FileCheck className="size-4" />
             <span className="flex-1 text-left">CHECK ELIGIBILITY</span>
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘E</span>
@@ -306,7 +306,7 @@ export function Layout() {
         {/* User dropdown */}
         {userMenuOpen && (
           <div className="absolute bottom-full left-0 right-0 mb-1 rounded-md border border-border bg-card shadow-lg overflow-hidden z-10">
-            <button onClick={() => { setUserMenuOpen(false); navigate('/app/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+            <button onClick={() => { setUserMenuOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
               <Settings className="size-3.5" />
               SETTINGS
             </button>
