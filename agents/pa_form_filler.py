@@ -161,8 +161,8 @@ Click "New Request" on the dashboard. Fill the request creation form:
   - Click "Continue" to advance past patient demographics
   - Insurance: BIN="{bin_value}", PCN="{pcn_value}", Group="{rx_group}"
 
-Wait for forms list. Select the FIRST "CVS Caremark" form you see (button: "Start Request").
-DO NOT click "Show More Forms" — the first CVS Caremark result is correct.
+Wait for forms list. Select the VERY FIRST form in the list by clicking its "Start Request" button.
+DO NOT click "Show More Forms" — just pick the first available form.
 If an interstitial "medications may be covered" page appears, click "Continue Prior Auth".
 
 ═══ STEP 3: FILL PA FORM — PATIENT SECTION ═══

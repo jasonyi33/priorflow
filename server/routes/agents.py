@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
 from server.services.convex_client import convex_client
 from server.services import orchestrator
@@ -23,28 +24,46 @@ async def list_agent_runs(
     mrn: Optional[str] = None,
     type: Optional[str] = None,
 ) -> list[dict]:
+    results: list[dict] = []
+
+    # 1. In-memory runs from orchestrator (current server process)
+    for state in orchestrator._run_states.values():
+        run = dict(state)
+        task = orchestrator._running_tasks.get(run["run_id"])
+        if task is not None and task.done() and run["status"] == "started":
+            exc = task.exception() if not task.cancelled() else None
+            run["status"] = "failed" if exc else "completed"
+            if exc:
+                run["error_message"] = str(exc)
+        results.append(run)
+
+    # 2. Convex (may have runs from previous server processes)
     if convex_client.enabled:
         try:
-            data = await convex_client.query("agentRuns:list")
-            if mrn:
-                data = [d for d in data if d.get("mrn") == mrn]
-            if type:
-                data = [d for d in data if d.get("agentType") == type or d.get("agent_type") == type]
-            if data:
-                return data
+            convex_data = await convex_client.query("agentRuns:list")
+            in_memory_ids = {r["run_id"] for r in results}
+            for d in convex_data or []:
+                rid = d.get("runId") or d.get("run_id") or d.get("id", "")
+                if rid not in in_memory_ids:
+                    results.append(d)
         except Exception:
             logger.warning("Convex query failed for agentRuns:list", exc_info=True)
 
-    fixture_file = FIXTURES_DIR / "agent_run_sample.json"
-    if fixture_file.exists():
-        with open(fixture_file) as f:
-            data = json.load(f)
-            if mrn and data.get("mrn") != mrn:
-                return []
-            if type and data.get("agent_type") != type:
-                return []
-            return [data]
-    return []
+    # 3. Fixture fallback (only when nothing else returned data)
+    if not results:
+        fixture_file = FIXTURES_DIR / "agent_run_sample.json"
+        if fixture_file.exists():
+            with open(fixture_file) as f:
+                data = json.load(f)
+                results.append(data)
+
+    # Apply filters
+    if mrn:
+        results = [r for r in results if r.get("mrn") == mrn]
+    if type:
+        results = [r for r in results if r.get("agentType") == type or r.get("agent_type") == type]
+
+    return results
 
 
 @router.get("/runs/{run_id}")
@@ -63,3 +82,19 @@ async def get_agent_run(run_id: str) -> dict:
             pass
 
     raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+
+OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
+
+
+@router.get("/gif/{filename}")
+async def download_agent_gif(filename: str):
+    """Serve a recorded agent GIF for download."""
+    if not filename.endswith(".gif"):
+        raise HTTPException(status_code=400, detail="Only .gif files supported")
+    # Prevent path traversal
+    safe_name = Path(filename).name
+    gif_path = OUTPUT_DIR / safe_name
+    if not gif_path.exists():
+        raise HTTPException(status_code=404, detail=f"GIF {safe_name} not found")
+    return FileResponse(gif_path, media_type="image/gif", filename=safe_name)

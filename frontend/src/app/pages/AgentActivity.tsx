@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { AgentRun } from '../../lib/types';
 import { api } from '../../lib/api';
 import { formatDistanceToNow, differenceInSeconds } from 'date-fns';
-import { CheckCircle2, XCircle, Loader2, RefreshCw, Clock, Activity, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, RefreshCw, Clock, Activity, ChevronRight, Download } from 'lucide-react';
 
 type TabKey = 'all' | 'running' | 'completed' | 'failed';
 
@@ -38,6 +38,12 @@ export function AgentActivity() {
   };
 
   useEffect(() => { loadRuns(); }, []);
+
+  // Auto-poll every 5s to keep runs/logs updated
+  useEffect(() => {
+    const interval = setInterval(loadRuns, 5000);
+    return () => clearInterval(interval);
+  }, [selectedId]);
 
   const filtered: Record<TabKey, AgentRun[]> = {
     all: runs,
@@ -210,15 +216,28 @@ export function AgentActivity() {
                   )}
                 </div>
 
-                {/* Result */}
+                {/* Result / Output */}
                 {selected.result && (
                   <div className="flex flex-col max-h-48 overflow-hidden">
                     <div className="flex items-center gap-2 px-5 py-2.5 border-b border-border/50">
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">Result</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50">Output</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto px-5 py-3">
+                    <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+                      {selected.result.gifUrl && (
+                        <a
+                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${selected.result.gifUrl}`}
+                          download
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 border border-border rounded text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
+                        >
+                          <Download className="size-3" />
+                          Download Agent Recording (.gif)
+                        </a>
+                      )}
                       <pre className="text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                        {JSON.stringify(selected.result, null, 2)}
+                        {JSON.stringify(
+                          Object.fromEntries(Object.entries(selected.result).filter(([k]) => k !== 'gifUrl')),
+                          null, 2
+                        )}
                       </pre>
                     </div>
                   </div>

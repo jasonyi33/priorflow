@@ -47,12 +47,35 @@ async def list_pa_requests(mrn: Optional[str] = None, status: Optional[str] = No
             logger.warning("Convex query failed for paRequests", exc_info=True)
 
     results = []
-    if mrn:
-        output_file = OUTPUT_DIR / f"pa_submission_{mrn}.json"
-        if output_file.exists():
-            with open(output_file) as f:
-                results.append(json.load(f))
+    seen_mrns: set[str] = set()
 
+    # 1. In-memory PA results from orchestrator (most up-to-date)
+    for pa_mrn, pa_data in orchestrator._pa_results.items():
+        if mrn and pa_mrn != mrn:
+            continue
+        if status and pa_data.get("status") != status:
+            continue
+        seen_mrns.add(pa_mrn)
+        results.append(pa_data)
+
+    # 2. Scan output directory for pa_submission_*.json files
+    for output_file in sorted(OUTPUT_DIR.glob("pa_submission_*.json"), reverse=True):
+        try:
+            with open(output_file) as f:
+                data = json.load(f)
+            file_mrn = data.get("mrn", "")
+            if file_mrn in seen_mrns:
+                continue
+            seen_mrns.add(file_mrn)
+            if mrn and file_mrn != mrn:
+                continue
+            if status and data.get("status") != status:
+                continue
+            results.append(data)
+        except Exception:
+            logger.warning("Failed to read %s", output_file, exc_info=True)
+
+    # 3. Fixture fallback only if nothing found
     if not results:
         fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
         if fixture_file.exists():
