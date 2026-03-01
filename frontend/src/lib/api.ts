@@ -118,9 +118,12 @@ const AGENT_TYPE_MAP: Record<string, AgentRun['type']> = {
 
 function toAgentRun(data: any): AgentRun {
   let status: AgentRun['status'];
-  if (data.status === 'completed' && data.success !== false) status = 'completed';
-  else if (data.status === 'failed' || (data.completed_at && data.success === false)) status = 'failed';
-  else if (data.completed_at && data.success === true) status = 'completed';
+  const completedAt = data.completed_at || data.completedAt;
+  const success = data.success;
+  if (data.status === 'completed' && success !== false) status = 'completed';
+  else if (data.status === 'failed' || (completedAt && success === false)) status = 'failed';
+  else if (completedAt && success === true) status = 'completed';
+  else if (completedAt) status = success === false ? 'failed' : 'completed';
   else status = 'running';
 
   // Use backend logs array if available, otherwise generate a summary line
