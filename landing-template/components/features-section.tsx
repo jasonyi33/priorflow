@@ -11,7 +11,7 @@ export default function FeaturesSection() {
               Built for the complexity of healthcare.
             </h2>
           </div>
-          <p className="text-muted-foreground text-sm max-w-xs hidden md:block">
+          <p className="text-muted-foreground text-sm max-w-sm hidden md:block">
             Every feature designed around the real workflows of clinical teams managing prior authorization at scale.
           </p>
         </div>
