@@ -6,7 +6,7 @@ fills the form with chart data, writes clinical justification, and submits.
 
 This is the CORE DEMO FEATURE — the "money" agent.
 
-Uses Browser Use Cloud SDK (v3 API + browser-use-llm) for stealth browser automation.
+Uses Browser Use Cloud SDK (v2 API + browser-use-2.0) for stealth browser automation.
 
 Owned by Dev 3.
 """
@@ -32,8 +32,8 @@ load_dotenv()
 CLOUD_PROFILE_ID = os.getenv(
     "BROWSER_USE_PROFILE_ID", "bcf273d4-abc4-40c4-b506-8ad330d4c678"
 )
-CLOUD_BASE_URL = os.getenv("BROWSER_USE_BASE_URL", "https://api.browser-use.com/api/v3")
-CLOUD_LLM = os.getenv("BROWSER_USE_LLM", "browser-use-llm")
+# SDK v2.0.x default base_url is https://api.browser-use.com/api/v2 — do NOT override
+CLOUD_LLM = os.getenv("BROWSER_USE_LLM", "browser-use-2.0")
 
 
 def _format_phone(raw: str) -> str:
@@ -149,7 +149,7 @@ Click "Send To Prescriber" (NOT "Send To Plan").
 async def fill_covermymeds_pa(mrn: str):
     """Drive the CoverMyMeds portal to submit a prior authorization.
 
-    Uses Browser Use Cloud SDK with v3 API.
+    Uses Browser Use Cloud SDK with v2 API.
     Flow: Login → New Request → Enter med + demographics → Select form →
     Fill Caremark ePA fields → Send To Prescriber.
     """
@@ -161,15 +161,11 @@ async def fill_covermymeds_pa(mrn: str):
     # Create cloud client
     client = AsyncBrowserUse(
         api_key=os.getenv("BROWSER_USE_API_KEY"),
-        base_url=CLOUD_BASE_URL,
     )
 
     # Create session with synced profile (CoverMyMeds auth cookies)
     session = await client.sessions.create_session(
         profile_id=CLOUD_PROFILE_ID,
-        start_url=COVERMYMEDS_URL,
-        persist_memory=True,
-        keep_alive=True,
     )
     print(f"🌐 Cloud session: {session.id}")
     if hasattr(session, "live_url"):
@@ -197,10 +193,11 @@ async def fill_covermymeds_pa(mrn: str):
                 "- Do NOT create files, write notes, or make todo lists — just fill the form.\n"
             ),
             thinking=True,
+            flash_mode=True,
         )
 
         # Stream progress
-        print(f"🤖 Task started: {task.id}")
+        print(f"🤖 Task started (flash mode): {task.id}")
         async for step in task.stream():
             step_num = getattr(step, "number", "?")
             goal = getattr(step, "next_goal", getattr(step, "status", ""))
@@ -216,7 +213,18 @@ async def fill_covermymeds_pa(mrn: str):
         return submission
 
     except Exception as e:
+        import traceback
         print(f"❌ Agent failed for {mrn}: {e}")
+        traceback.print_exc()
+        # Try to salvage result if task actually completed
+        try:
+            task_result = await client.tasks.get_task(task.id)
+            if task_result.is_success:
+                print(f"⚠️  Task actually succeeded despite error. Output: {task_result.output}")
+                submission = await _post_process(mrn, chart, task_result)
+                return submission
+        except Exception:
+            pass
         return None
     finally:
         try:
@@ -305,14 +313,10 @@ async def fill_covermymeds_from_key(
 
     client = AsyncBrowserUse(
         api_key=os.getenv("BROWSER_USE_API_KEY"),
-        base_url=CLOUD_BASE_URL,
     )
 
     session = await client.sessions.create_session(
         profile_id=CLOUD_PROFILE_ID,
-        start_url=COVERMYMEDS_KEY_URL,
-        persist_memory=True,
-        keep_alive=True,
     )
     print(f"🌐 Cloud session (key flow): {session.id}")
 
