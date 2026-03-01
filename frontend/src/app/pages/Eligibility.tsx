@@ -164,9 +164,9 @@ export function Eligibility() {
             <div className="grid grid-cols-12 gap-x-3 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/50 border-b border-border/50">
               <span className="col-span-2">Patient</span>
               <span className="col-span-3">Insurance</span>
-              <span className="col-span-4">Coverage Details</span>
+              <span className="col-span-3">Coverage Details</span>
               <span className="col-span-2 text-center">Status</span>
-              <span className="col-span-1 text-right">Checked</span>
+              <span className="col-span-2 text-right">Checked</span>
             </div>
 
             {loading ? (
@@ -175,9 +175,9 @@ export function Eligibility() {
                   <div key={index} className="grid grid-cols-12 gap-x-3 px-5 py-3 items-center">
                     <div className="col-span-2 h-4 bg-muted rounded animate-pulse" />
                     <div className="col-span-3 h-3 bg-muted rounded animate-pulse" />
-                    <div className="col-span-4 h-3 bg-muted rounded animate-pulse" />
+                    <div className="col-span-3 h-3 bg-muted rounded animate-pulse" />
                     <div className="col-span-2 h-5 bg-muted rounded animate-pulse mx-auto" />
-                    <div className="col-span-1 h-3 bg-muted rounded animate-pulse ml-auto" />
+                    <div className="col-span-2 h-3 bg-muted rounded animate-pulse ml-auto" />
                   </div>
                 ))}
               </div>
@@ -196,7 +196,7 @@ export function Eligibility() {
                         {result.insuranceProvider}
                       </div>
                     </div>
-                    <div className="col-span-4 min-w-0">
+                    <div className="col-span-3 min-w-0">
                       <div className="text-xs text-muted-foreground/70 leading-snug">
                         {result.coverageDetails ?? '—'}
                       </div>
@@ -212,7 +212,7 @@ export function Eligibility() {
                         </span>
                       )}
                     </div>
-                    <div className="col-span-1 text-[10px] text-muted-foreground/40 text-right whitespace-nowrap">
+                    <div className="col-span-2 text-[10px] text-muted-foreground/40 text-right whitespace-nowrap">
                       {formatDistanceToNow(new Date(result.checkDate), { addSuffix: true })}
                     </div>
                   </div>

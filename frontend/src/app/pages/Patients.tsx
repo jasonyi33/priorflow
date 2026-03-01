@@ -86,7 +86,7 @@ export function Patients() {
             <span className="col-span-2">Provider</span>
             <span className="col-span-1 text-center">Age</span>
             <span className="col-span-1 text-center">Active PAs</span>
-            <span className="col-span-1 text-right">Chart</span>
+            <span className="col-span-1 text-center">Chart</span>
           </div>
 
           {loading ? (
@@ -99,7 +99,7 @@ export function Patients() {
                   <div className="col-span-2 h-3 bg-muted rounded animate-pulse" />
                   <div className="col-span-1 h-3 bg-muted rounded animate-pulse mx-auto" />
                   <div className="col-span-1 h-5 bg-muted rounded animate-pulse mx-auto" />
-                  <div className="col-span-1 h-5 bg-muted rounded animate-pulse ml-auto" />
+                  <div className="col-span-1 h-5 bg-muted rounded animate-pulse mx-auto" />
                 </div>
               ))}
             </div>
@@ -153,7 +153,7 @@ export function Patients() {
                         </span>
                       )}
                     </div>
-                    <div className="col-span-1 flex justify-end">
+                    <div className="col-span-1 flex justify-center">
                       {patient.chartUrl ? (
                         <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] bg-primary/8 text-primary border border-primary/20 rounded font-semibold">
                           <FileText className="size-2.5" />
