@@ -26,7 +26,7 @@ except Exception:  # noqa: BLE001
 
         return _decorator
 
-from shared.models import AgentType, Portal, AgentRun, EligibilityResult, PARequest, PAStatusUpdate
+from shared.models import AgentType, Portal, AgentRun, EligibilityResult, PARequest, PAStatusEnum, PAStatusUpdate
 from server.observability import initialize_laminar
 from server.services.convex_client import convex_client
 from tools import db_client
@@ -257,6 +257,11 @@ async def _run_eligibility(mrn: str, portal: Portal):
     run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "eligibility" and s["status"] in ("started", "retrying")), None)
     if run_id:
         _log_step(run_id, "Loading patient chart data")
+    await db_client.ensure_pa_request_entry(
+        mrn=mrn, portal=Portal.COVERMYMEDS,
+        status=PAStatusEnum.CHECKING_ELIGIBILITY,
+        updated_at=datetime.now(UTC).isoformat(),
+    )
     if _is_live_execution(AgentType.ELIGIBILITY):
         from agents.eligibility_checker import check_eligibility_stedi
         if run_id:
@@ -289,6 +294,11 @@ async def _run_pa_submission(mrn: str, portal: Portal):
     run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "pa_form_filler" and s["status"] in ("started", "retrying")), None)
     if run_id:
         _log_step(run_id, "Loading patient chart and clinical data")
+    await db_client.ensure_pa_request_entry(
+        mrn=mrn, portal=portal,
+        status=PAStatusEnum.GENERATING_REQUEST,
+        updated_at=datetime.now(UTC).isoformat(),
+    )
     if ENABLE_AGENT_EXECUTION:
         from agents.pa_form_filler import fill_covermymeds_pa
         if run_id:
