@@ -29,6 +29,28 @@ load_dotenv()
 tools = Tools()
 
 
+def _format_phone(raw: str) -> str:
+    """Normalize phone to XXX-XXX-XXXX format for CoverMyMeds."""
+    digits = "".join(c for c in raw if c.isdigit())
+    if len(digits) == 7:
+        digits = "555" + digits  # prefix area code for short numbers
+    if len(digits) == 10:
+        return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+    return raw  # return as-is if can't format
+
+
+def _infer_gender(first_name: str) -> str:
+    """Simple heuristic for demo purposes — infer gender from first name."""
+    female_names = {"jane", "sarah", "lisa", "mary", "emily", "anna", "emma", "jessica", "ashley"}
+    male_names = {"david", "john", "james", "robert", "michael", "william", "daniel", "mark", "tom"}
+    lower = first_name.lower()
+    if lower in female_names:
+        return "Female"
+    if lower in male_names:
+        return "Male"
+    return "Female"  # default fallback
+
+
 @tools.action("Load patient chart data for PA submission")
 async def load_chart_action(mrn: str) -> ActionResult:
     chart = load_chart(mrn)
@@ -62,39 +84,79 @@ async def load_eligibility(mrn: str) -> ActionResult:
 
 
 @tools.action("Generate clinical justification narrative")
-async def generate_justification(
-    diagnosis: str,
-    medication: str,
-    prior_therapies: str,
-    labs: str,
-) -> ActionResult:
-    """Build a medical necessity narrative from structured chart data.
+async def generate_justification(mrn: str) -> ActionResult:
+    """Build a medical necessity narrative from the full patient chart.
 
-    TODO: Dev 3 — Enhance in Phase 2 with more sophisticated narrative generation.
-    Consider using Claude for richer clinical language.
+    Uses the standalone justification generator for a comprehensive narrative
+    including prior therapies, labs, imaging, and provider info.
     """
-    narrative = (
-        f"Clinical Justification for Prior Authorization\n\n"
-        f"Patient presents with {diagnosis}. "
-        f"The following conservative therapies have been attempted and failed "
-        f"to provide adequate relief: {prior_therapies}. "
-        f"Relevant laboratory findings include: {labs}. "
-        f"Based on clinical guidelines and the patient's treatment history, "
-        f"{medication} is medically necessary as the next appropriate step in "
-        f"the treatment algorithm. The patient meets all payer criteria for "
-        f"this therapy."
-    )
+    from tools.chart_loader import load_chart as load_chart_pydantic
+    from tools.justification_gen import generate_justification as gen_justification
+
+    chart = load_chart_pydantic(mrn)
+    narrative = gen_justification(chart)
     return ActionResult(
         extracted_content=narrative,
-        long_term_memory="Clinical justification has been generated",
+        long_term_memory="Clinical justification has been generated with full detail",
     )
 
 
 @tools.action("Record what fields were filled and any gaps found")
-async def record_submission(mrn: str, summary: str) -> ActionResult:
-    save_output(f"pa_submission_{mrn}.json", {"mrn": mrn, "summary": summary})
+async def record_submission(
+    mrn: str,
+    fields_filled: str,
+    gaps_detected: str,
+    justification_summary: str,
+    submission_status: str,
+) -> ActionResult:
+    """Save a PARequest-conformant submission record.
+
+    Args:
+        mrn: Patient MRN
+        fields_filled: Comma-separated list of fields successfully filled
+        gaps_detected: Comma-separated list of "GAP: field — reason" entries
+        justification_summary: Clinical justification narrative text
+        submission_status: "submitted" or "pending"
+    """
+    from datetime import datetime, timezone
+    from shared.models import PARequest, PAStatusEnum, Portal
+    from tools.db_client import save_pa_request
+
+    chart = load_chart(mrn)
+    med_name = chart.get("medication", {}).get("name", "Unknown")
+    med_dose = chart.get("medication", {}).get("dose", "")
+
+    fields_list = [f.strip() for f in fields_filled.split(",") if f.strip()]
+    gaps_list = [g.strip() for g in gaps_detected.split(",") if g.strip()]
+
+    status = (
+        PAStatusEnum.SUBMITTED if submission_status.lower() == "submitted"
+        else PAStatusEnum.PENDING
+    )
+    now = datetime.now(timezone.utc)
+
+    pa_request = PARequest(
+        mrn=mrn,
+        portal=Portal.COVERMYMEDS,
+        medication_or_procedure=f"{med_name} {med_dose}".strip(),
+        status=status,
+        fields_filled=fields_list,
+        gaps_detected=gaps_list,
+        justification_summary=justification_summary,
+        created_at=now,
+        updated_at=now,
+    )
+
+    await save_pa_request(pa_request)
+
     return ActionResult(
-        extracted_content=f"PA submission recorded for {mrn}",
+        extracted_content=(
+            f"PA submission recorded for {mrn}:\n"
+            f"  Status: {status.value}\n"
+            f"  Fields filled: {len(fields_list)}\n"
+            f"  Gaps detected: {len(gaps_list)}\n"
+            f"  Saved to output/pa_submission_{mrn}.json"
+        ),
         is_done=True,
         success=True,
     )
@@ -140,6 +202,13 @@ async def fill_covermymeds_pa(mrn: str):
     dob_parts = patient["dob"].split("-")
     dob_formatted = f"{dob_parts[1]}/{dob_parts[2]}/{dob_parts[0]}" if len(dob_parts) == 3 else patient["dob"]
 
+    # Format phone numbers to XXX-XXX-XXXX
+    provider_phone = _format_phone(provider.get("phone", ""))
+    provider_fax = _format_phone(provider.get("fax", ""))
+
+    # Infer gender from patient first name
+    patient_gender = _infer_gender(patient["first_name"])
+
     # Format prior therapies as readable string
     therapies_text = "\n".join(f"  - {t}" for t in prior_therapies)
     labs_text = "\n".join(f"  - {k}: {v}" for k, v in labs.items())
@@ -147,163 +216,99 @@ async def fill_covermymeds_pa(mrn: str):
 
     agent = Agent(
         task=f"""
-You are a prior authorization specialist. Submit a PA request on CoverMyMeds
-for the Caremark Electronic PA Form (2017 NCPDP).
+You are a prior authorization specialist. Submit a PA request on CoverMyMeds.
+IMPORTANT: You have limited steps. Be efficient — combine actions, avoid unnecessary scrolling/searching.
 
-═══════════════════════════════════════════════════════════════
-STEP 1: LOAD DATA
-═══════════════════════════════════════════════════════════════
-Use load_chart_action with MRN "{mrn}" to get all patient data.
-Use load_eligibility with MRN "{mrn}" to check prior eligibility results.
+═══ STEP 1: LOAD DATA ═══
+Use load_chart_action and load_eligibility TOGETHER with MRN "{mrn}".
 
-═══════════════════════════════════════════════════════════════
-STEP 2: LOGIN TO COVERMYMEDS
-═══════════════════════════════════════════════════════════════
-You are already on the CoverMyMeds portal. Log in if needed:
+═══ STEP 2: LOGIN ═══
+Log in if needed (skip if already on dashboard):
   - Username: x]cmm_username[x
   - Password: x]cmm_password[x
 
-IMPORTANT — EMAIL 2FA HANDLING:
-If after login you see an email verification / 2FA prompt (Okta),
-do the following:
-  1. Open a NEW TAB and navigate to https://mail.google.com
-  2. Gmail should already be logged in (using the same Chrome profile).
-  3. Look for the most recent email from Okta or CoverMyMeds with a
-     verification code or "Sign In" / "Verify" link.
-  4. If it contains a CODE, copy it. If it contains a LINK, click the link.
-  5. Switch back to the CoverMyMeds tab.
-  6. Enter the verification code if needed, or the page may have
-     auto-verified from clicking the link.
-  7. Close the Gmail tab when done.
+2FA HANDLING (only if prompted):
+  a) Click "Send me an email" to trigger the code.
+  b) Open a NEW TAB → https://mail.google.com
+  c) Click the VERY TOP/NEWEST email from Okta (subject: "One-time verification code").
+     CRITICAL: Always pick the newest email at the top, NEVER an older one.
+  d) Copy the 6-digit code from the email body.
+  e) Switch back to CoverMyMeds tab (NOTE: tab switch ends the current action — enter the code in the NEXT step).
+  f) Click "Enter a verification code instead" if you see that option.
+  g) Type the code into the input field (use clear: True) and click Verify.
 
-After login you should see the CoverMyMeds dashboard.
+═══ STEP 3: NEW REQUEST ═══
+Click "New Request" on the dashboard. Fill the request creation form:
+  - Medication: "{medication.get('name', 'Humira')}" → select from autocomplete dropdown
+  - Primary Diagnosis: "{diagnosis['icd10']}" → select "{diagnosis['icd10']} - {diagnosis['description']}" from autocomplete, then click "Continue"
+  - Patient: First="{patient['first_name']}", Last="{patient['last_name']}", Gender="{patient_gender}", DOB="{dob_formatted}", Zip="75001"
+  - Click "Continue" to advance past patient demographics
+  - Insurance: BIN="{insurance['bin']}", PCN="{insurance['pcn']}", Group="{insurance['rx_group']}"
 
-═══════════════════════════════════════════════════════════════
-STEP 3: CREATE NEW REQUEST
-═══════════════════════════════════════════════════════════════
-On the dashboard, click the "New Request" button.
-Then fill in these fields:
-  - Medication: "{medication.get('name', 'Humira')}"
-  - Patient First Name: "{patient['first_name']}"
-  - Patient Last Name: "{patient['last_name']}"
-  - Date of Birth: "{dob_formatted}"
-  - BIN: "{insurance['bin']}"
-  - PCN: "{insurance['pcn']}"
-  - Group: "{insurance['rx_group']}"
+Wait for forms list. Select the FIRST "CVS Caremark" form you see (button: "Start Request").
+DO NOT click "Show More Forms" — the first CVS Caremark result is correct.
+If an interstitial "medications may be covered" page appears, click "Continue Prior Auth".
 
-Wait for the list of matching PA forms to appear.
-Select the "Caremark Electronic PA Form (2017 NCPDP)" if available,
-or the most appropriate ePA form for this medication and plan.
-Then click "Start Request."
+═══ STEP 4: FILL PA FORM — PATIENT SECTION ═══
+  - Member ID: "{insurance['member_id']}"
+  - Street: "123 Main St" (placeholder — data gap)
+  - City: "Dallas" (placeholder)
+  - State: select "Texas"
+  - Zip: "75001"
 
-═══════════════════════════════════════════════════════════════
-STEP 4: FILL PATIENT SECTION
-═══════════════════════════════════════════════════════════════
-The form has these Patient fields — fill what we have:
+═══ STEP 5: FILL PA FORM — DRUG SECTION ═══
+  - Quantity: "1"
+  - Dosage Form: select "Kit" from dropdown (NOT "Pen" — it's not available)
+  - DAW: select "No"
+  - Days Supply: "30"
 
-  Name:
-    - First*: "{patient['first_name']}"
-    - Last*: "{patient['last_name']}"
-    - Prefix, Middle, Suffix: leave blank
+═══ STEP 6: FILL PA FORM — PROVIDER SECTION ═══
+  - NPI: "{provider['npi']}"
+  - First: "{provider_first}", Last: "{provider_last}"
+  - Street: "456 Medical Dr" (placeholder — data gap)
+  - City: "Dallas" (placeholder)
+  - State: select "Texas"
+  - Zip: "75001"
+  - Phone: "{provider_phone}" (format XXX-XXX-XXXX)
+  - Fax: "{provider_fax}"
 
-  Date of Birth*: "{dob_formatted}" (format MM/DD/YYYY)
+═══ STEP 7: TYPE OF REVIEW ═══
+  - Urgent review: select "No"
 
-  Gender*: Select "Female" (for Jane Doe)
+═══ STEP 8: SUBMIT + RECORD ═══
+Click "Send To Prescriber" (NOT "Send To Plan").
+  - Select "Email" method → "Continue"
+  - Enter prescriber email: abhi.pasam@gmail.com → "Send email"
 
-  Member ID: "{insurance['member_id']}"
-
-  Address — WE DO NOT HAVE THIS DATA. The form requires:
-    - Street* (required)
-    - City* (required)
-    - State* (required)
-    - Zip* (required)
-  These are GAPS. Skip if possible, or enter placeholder if form blocks progress.
-
-  Phone: leave blank (we don't have this)
-
-═══════════════════════════════════════════════════════════════
-STEP 5: FILL DRUG SECTION
-═══════════════════════════════════════════════════════════════
-  Medication Name: should be pre-filled (read-only)
-
-  Quantity*: Enter "1" (one pen per injection)
-
-  Confirm dosage form*: Select the appropriate option from dropdown
-    (look for "auto-injector" or "pen")
-
-  "Should this request be reviewed for a brand only product (DAW-1)?":
-    Select "No"
-
-  Days Supply*: Enter "30" (biweekly dosing = 2 injections per 30 days)
-
-  Primary Diagnosis: Enter "{diagnosis['icd10']}" — {diagnosis['description']}
-
-═══════════════════════════════════════════════════════════════
-STEP 6: FILL PROVIDER SECTION
-═══════════════════════════════════════════════════════════════
-  NPI*: "{provider['npi']}"
-
-  Name:
-    - First*: "{provider_first}"
-    - Last*: "{provider_last}"
-
-  Address — WE DO NOT HAVE PROVIDER ADDRESS. The form requires:
-    - Street* (required)
-    - City* (required)
-    - State* (required)
-    - Zip* (required)
-  These are GAPS. Skip if possible, or enter placeholder if form blocks progress.
-
-  Phone*: "{provider['phone']}" (format as XXX-XXX-XXXX: 555-010-0 → use "555-010-0100" or reformat)
-  Fax: "{provider['fax']}"
-
-═══════════════════════════════════════════════════════════════
-STEP 7: TYPE OF REVIEW
-═══════════════════════════════════════════════════════════════
-  "Are you requesting an URGENT review?": Select "No"
-
-═══════════════════════════════════════════════════════════════
-STEP 8: SKIP ELIGIBILITY — SEND TO PRESCRIBER
-═══════════════════════════════════════════════════════════════
-Do NOT click "Send To Plan" (it requires valid insurance).
-Instead, click the "Send To Prescriber" button.
-When prompted for a prescriber email, enter: abhi.pasam@gmail.com
-Confirm and send.
-
-═══════════════════════════════════════════════════════════════
-STEP 9: RECORD RESULTS
-═══════════════════════════════════════════════════════════════
-Use record_submission action with MRN "{mrn}" and a summary including:
-- All fields successfully filled
-- All gaps detected (missing data)
-- Whether submission was successful or blocked
-
-KNOWN DATA GAPS (fields required by form but missing from chart):
-- patient address (street, city, state, zip) — all required
-- patient phone — not required
-- provider address (street, city, state, zip) — all required
-- medication quantity (we're using "1" as default)
-- medication days supply (we're using "30" as default)
-
-CHART DATA AVAILABLE FOR REFERENCE:
-Prior therapies:
-{therapies_text}
-
-Labs:
-{labs_text}
-
-Imaging:
-{imaging_text}
+After confirmation, call generate_justification with MRN "{mrn}".
+Then call record_submission with:
+  - mrn: "{mrn}"
+  - fields_filled: "patient_first_name, patient_last_name, patient_dob, patient_gender, insurance_member_id, medication_quantity, medication_dosage_form, medication_daw, days_supply, diagnosis_icd10, provider_npi, provider_first_name, provider_last_name, provider_phone, provider_fax, urgent_review"
+  - gaps_detected: "GAP: patient_address — using placeholder, GAP: provider_address — using placeholder"
+  - justification_summary: the text from generate_justification
+  - submission_status: "submitted"
 """,
         llm=ChatBrowserUse(),
         browser=browser,
         tools=tools,
         sensitive_data=get_sensitive_data(),
         use_vision=True,
-        max_actions_per_step=DEFAULT_MAX_ACTIONS_PER_STEP,
+        max_actions_per_step=3,
+        max_failures=5,
         generate_gif=True,
         step_timeout=120,
         directly_open_url=False,
+        save_conversation_path=f"output/conversation_{mrn}.json",
+        extend_system_message=(
+            "EFFICIENCY RULES:\n"
+            "- Combine multiple input actions per step (up to 3). Fill adjacent fields together.\n"
+            "- NEVER click 'Show More Forms' — always select the first matching form.\n"
+            "- Tab switch terminates the current action sequence. Plan: switch tab in one step, then interact in the next.\n"
+            "- For dropdowns, use select_dropdown action directly — don't click then select separately.\n"
+            "- If a field is not visible, scroll to find it — don't navigate away.\n"
+            "- If input shows 'Invalid', try clearing the field first (clear: True) then re-enter.\n"
+            "- Do NOT create files, write notes, or make todo lists — just fill the form.\n"
+        ),
         initial_actions=[
             {"navigate": {"url": COVERMYMEDS_URL}},
         ],
@@ -320,33 +325,101 @@ Imaging:
 
 
 async def fill_covermymeds_from_key(
-    access_key: str, patient_last: str, patient_dob: str
+    access_key: str, patient_last: str, patient_dob: str, mrn: str = "UNKNOWN"
 ):
-    """Handle pharmacy-initiated PA: enter a key from a fax.
+    """Handle pharmacy-initiated PA: enter an access key from a fax.
 
-    TODO: Dev 3 — Implement in Phase 3 (nice-to-have).
+    Flow: Navigate to key.covermymeds.com → Enter key + patient info →
+    Review pre-populated form → Fill missing clinical info → Submit.
     """
     browser_config = get_browser_config()
-    browser = Browser(headless=browser_config["headless"])
+    browser = Browser(
+        headless=browser_config["headless"],
+        executable_path="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        user_data_dir="~/Library/Application Support/Google/Chrome",
+        profile_directory="Default",
+        args=["--disable-extensions", "--disable-background-networking"],
+        wait_for_network_idle_page_load_time=3.0,
+        minimum_wait_page_load_time=1.0,
+        wait_between_actions=0.5,
+    )
+
+    # Format DOB for the form
+    dob_parts = patient_dob.split("-")
+    dob_formatted = (
+        f"{dob_parts[1]}/{dob_parts[2]}/{dob_parts[0]}"
+        if len(dob_parts) == 3
+        else patient_dob
+    )
 
     agent = Agent(
         task=f"""
-        A pharmacy initiated a prior authorization for a patient.
-        We received a fax with an access key.
+You are a prior authorization specialist. A pharmacy has initiated a PA request
+and sent a fax with an access key. Complete the PA using the key.
 
-        1. Navigate to {COVERMYMEDS_KEY_URL}
-        2. Enter the access key: {access_key}
-        3. Enter the patient's last name: {patient_last}
-        4. Enter the patient's date of birth: {patient_dob}
-        5. Review the pre-populated PA form
-        6. Fill in any missing clinical information using chart data
-        7. Complete and submit the PA request
-        """,
+═══════════════════════════════════════════════════════════════
+STEP 1: ENTER ACCESS KEY
+═══════════════════════════════════════════════════════════════
+You are on the CoverMyMeds key lookup page.
+Enter the following information:
+  - Access Key: {access_key}
+  - Patient Last Name: {patient_last}
+  - Date of Birth: {dob_formatted} (format MM/DD/YYYY)
+
+Click "Find Request" or the submit button.
+Wait for the form to load.
+
+═══════════════════════════════════════════════════════════════
+STEP 2: REVIEW PRE-POPULATED FORM
+═══════════════════════════════════════════════════════════════
+The pharmacy has already filled in some fields (medication, patient info).
+Review what's been filled and identify any missing required fields.
+
+═══════════════════════════════════════════════════════════════
+STEP 3: FILL MISSING CLINICAL INFO
+═══════════════════════════════════════════════════════════════
+If the form has clinical questions or empty required fields:
+  - Use load_chart_action with MRN "{mrn}" to get clinical data
+  - Fill in diagnosis, prior therapies, labs as needed
+  - Answer any clinical criteria questions using chart data
+
+═══════════════════════════════════════════════════════════════
+STEP 4: SUBMIT
+═══════════════════════════════════════════════════════════════
+Click "Send To Prescriber" and enter: abhi.pasam@gmail.com
+Confirm and send.
+
+═══════════════════════════════════════════════════════════════
+STEP 5: RECORD RESULTS
+═══════════════════════════════════════════════════════════════
+Use record_submission with:
+  - mrn: "{mrn}"
+  - fields_filled: comma-separated list of fields you filled
+  - gaps_detected: comma-separated list of any missing fields
+  - justification_summary: "Pharmacy-initiated PA via access key {access_key}"
+  - submission_status: "submitted" or "pending"
+""",
         llm=ChatBrowserUse(),
         browser=browser,
+        tools=tools,
         sensitive_data=get_sensitive_data(),
         use_vision=True,
+        max_actions_per_step=2,
+        max_failures=5,
+        generate_gif=True,
+        step_timeout=120,
+        directly_open_url=False,
+        save_conversation_path=f"output/conversation_key_{access_key}.json",
+        initial_actions=[
+            {"navigate": {"url": COVERMYMEDS_KEY_URL}},
+        ],
     )
 
-    history = await agent.run(max_steps=30)
-    return history
+    try:
+        history = await agent.run(max_steps=30)
+        if not history.is_done():
+            print(f"⚠️  Key flow agent did not complete — used all 30 steps")
+        return history
+    except Exception as e:
+        print(f"❌ Key flow agent failed: {e}")
+        return None
