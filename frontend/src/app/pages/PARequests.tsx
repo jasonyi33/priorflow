@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { FileText, CheckCircle2, XCircle, Clock, AlertCircle, Search, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { StatusTimeline } from '../components/StatusTimeline';
 import { usePADashboardContext } from '../../lib/hooks';
 import { PARequest } from '../../lib/types';
+import { TabFocusRail } from '../components/TabFocusRail';
+import { TabFocusSignal, getFocusBucket, useStickyFocusKey } from '../../lib/focusSignals';
 
 type TabKey = 'all' | 'pending' | 'approved' | 'denied' | 'info_needed';
 
@@ -64,6 +66,92 @@ export function PARequests() {
 
   const requests = dashboard.paRequests;
   const loading = dashboard.loading;
+  const sortedByNewest = useMemo(
+    () =>
+      [...requests].sort(
+        (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+      ),
+    [requests]
+  );
+  const sortedByOldest = useMemo(
+    () =>
+      [...requests].sort(
+        (a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime()
+      ),
+    [requests]
+  );
+
+  const focusSignalByRequestId = useMemo(() => {
+    const map = new Map<string, TabFocusSignal>();
+    for (const request of requests) {
+      if (request.status === 'more_info_needed') {
+        map.set(request.id, {
+          key: request.id,
+          title: 'Action Required: Missing Information',
+          message: `${request.patientName} requires additional documentation before progression.`,
+          timestamp: request.lastUpdated,
+          severity: 'high',
+          actionLabel: 'Pin Focus In Table',
+        });
+        continue;
+      }
+      if (request.status === 'denied') {
+        map.set(request.id, {
+          key: request.id,
+          title: 'Denial Needs Review',
+          message: `${request.patientName} was denied and should be reviewed for next action.`,
+          timestamp: request.lastUpdated,
+          severity: 'high',
+          actionLabel: 'Pin Focus In Table',
+        });
+        continue;
+      }
+      if (PENDING_STATUSES.includes(request.status)) {
+        map.set(request.id, {
+          key: request.id,
+          title: 'In-Flight Request Queue',
+          message: `${request.patientName} is still progressing through the authorization pipeline.`,
+          timestamp: request.lastUpdated,
+          severity: 'medium',
+          actionLabel: 'Pin Focus In Table',
+        });
+        continue;
+      }
+
+      map.set(request.id, {
+        key: request.id,
+        title: 'Latest Request Update',
+        message: `${request.patientName} has the latest resolved authorization update.`,
+        timestamp: request.lastUpdated,
+        severity: 'low',
+        actionLabel: 'Pin Focus In Table',
+      });
+    }
+    return map;
+  }, [requests]);
+
+  const focusCandidate = useMemo(() => {
+    const latestInfoNeeded = sortedByNewest.find((request) => request.status === 'more_info_needed');
+    if (latestInfoNeeded) return focusSignalByRequestId.get(latestInfoNeeded.id) || null;
+
+    const latestDenied = sortedByNewest.find((request) => request.status === 'denied');
+    if (latestDenied) return focusSignalByRequestId.get(latestDenied.id) || null;
+
+    const oldestPending = sortedByOldest.find((request) => PENDING_STATUSES.includes(request.status));
+    if (oldestPending) return focusSignalByRequestId.get(oldestPending.id) || null;
+
+    const newest = sortedByNewest[0];
+    if (!newest) return null;
+    return focusSignalByRequestId.get(newest.id) || null;
+  }, [focusSignalByRequestId, sortedByNewest, sortedByOldest]);
+
+  const stickyFocusKey = useStickyFocusKey(
+    focusCandidate ? { key: focusCandidate.key, severity: focusCandidate.severity } : null
+  );
+  const activeFocusSignal = (stickyFocusKey && focusSignalByRequestId.get(stickyFocusKey)) || focusCandidate;
+  const activeFocusRequest = activeFocusSignal
+    ? requests.find((request) => request.id === activeFocusSignal.key)
+    : undefined;
 
   const filtered: Record<TabKey, PARequest[]> = {
     all: requests,
@@ -98,6 +186,34 @@ export function PARequests() {
     setRefreshing(false);
   };
 
+  const tabForStatus = (status: PARequest['status']): TabKey => {
+    if (status === 'more_info_needed') return 'info_needed';
+    if (status === 'denied') return 'denied';
+    if (status === 'approved') return 'approved';
+    if (PENDING_STATUSES.includes(status)) return 'pending';
+    return 'all';
+  };
+
+  const scrollToRow = useCallback((key: string, attempt: number = 0) => {
+    const escaped = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const row = document.querySelector(`[data-focus-key="${escaped}"]`) as HTMLElement | null;
+    if (row) {
+      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if (attempt < 6) {
+      window.setTimeout(() => scrollToRow(key, attempt + 1), 80);
+    }
+  }, []);
+
+  const handlePinFocus = useCallback(() => {
+    if (!activeFocusRequest) return;
+    setActiveTab(tabForStatus(activeFocusRequest.status));
+    setSearch('');
+    setSelectedRequest(activeFocusRequest);
+    window.setTimeout(() => scrollToRow(activeFocusRequest.id), 50);
+  }, [activeFocusRequest, scrollToRow]);
+
   const relatedRun = selectedRequest
     ? dashboard.agentRuns
         .filter((run) => run.patientId === selectedRequest.patientId && run.type === 'pa_submission')
@@ -108,6 +224,12 @@ export function PARequests() {
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
+        <TabFocusRail
+          signal={activeFocusSignal}
+          onAction={handlePinFocus}
+          disabled={!activeFocusRequest}
+        />
+
         <div className="flex-1 rounded border border-border bg-card overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border gap-4">
             <div className="flex items-center gap-2">
@@ -176,17 +298,33 @@ export function PARequests() {
             <div className="divide-y divide-border overflow-y-auto">
               {items.map((request) => {
                 const stage = stageLabel(request.status);
+                const isFocus = activeFocusRequest?.id === request.id;
+                const focusBucket = isFocus ? getFocusBucket(activeFocusSignal?.timestamp) : 'stale';
                 return (
                   <div
                     key={request.id}
+                    data-focus-key={request.id}
                     onClick={() => {
                       setSelectedRequest(request);
                       setDetailsOpen(true);
                     }}
-                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors cursor-pointer"
+                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors cursor-pointer ${
+                      isFocus
+                        ? focusBucket === 'hot'
+                          ? 'border-l-2 border-primary bg-primary/10 hover:bg-primary/12'
+                          : 'border-l-2 border-primary/40 bg-primary/5 hover:bg-primary/8'
+                        : 'hover:bg-accent/35'
+                    }`}
                   >
                     <div className="col-span-3 min-w-0">
-                      <div className="text-sm font-semibold truncate">{request.patientName}</div>
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        <span className="truncate">{request.patientName}</span>
+                        {isFocus && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider">
+                            focus
+                          </span>
+                        )}
+                      </div>
                       {request.approvalCode && (
                         <div className="text-[10px] text-success/80 font-semibold tracking-wide">Auth: {request.approvalCode}</div>
                       )}
