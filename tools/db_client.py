@@ -38,7 +38,7 @@ async def save_eligibility_result(result: EligibilityResult) -> bool:
             if payload.get("raw_response") is not None:
                 args["rawResponse"] = payload["raw_response"]
             await convex_client.mutation(
-                "eligibilityChecks:create",
+                "eligibilityChecks:upsert",
                 args,
             )
             saved_to_convex = True
