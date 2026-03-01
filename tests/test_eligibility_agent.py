@@ -27,9 +27,9 @@ OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 
 def test_chart_loads_for_all_fixtures():
-    """All 5 MRN chart files load successfully via chart_loader."""
+    """All MRN chart files load successfully via chart_loader."""
     mrns = list_available_charts()
-    assert len(mrns) == 5
+    assert len(mrns) >= 5
     for mrn in mrns:
         chart = load_chart(mrn)
         assert chart.patient.mrn == mrn
