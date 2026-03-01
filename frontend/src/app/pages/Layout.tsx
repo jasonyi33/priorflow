@@ -23,12 +23,12 @@ import { PADashboardContext, usePADashboard } from '../../lib/hooks';
 import { buildLiveNotifications, getInitials, getPrimaryProvider } from '../../lib/dashboard';
 
 const navigation = [
-  { name: 'DASHBOARD', href: '/', icon: LayoutDashboard },
-  { name: 'PATIENTS', href: '/patients', icon: Users },
-  { name: 'ELIGIBILITY', href: '/eligibility', icon: FileCheck },
-  { name: 'PA REQUESTS', href: '/pa-requests', icon: ClipboardList },
-  { name: 'AGENT ACTIVITY', href: '/agent-activity', icon: Activity },
-  { name: 'MOCK PORTAL', href: '/mock-portal', icon: Globe },
+  { name: 'DASHBOARD', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'PATIENTS', href: '/dashboard/patients', icon: Users },
+  { name: 'ELIGIBILITY', href: '/dashboard/eligibility', icon: FileCheck },
+  { name: 'PA REQUESTS', href: '/dashboard/pa-requests', icon: ClipboardList },
+  { name: 'AGENT ACTIVITY', href: '/dashboard/agent-activity', icon: Activity },
+  { name: 'MOCK PORTAL', href: '/dashboard/mock-portal', icon: Globe },
 ];
 
 interface Notification {
@@ -104,11 +104,11 @@ export function Layout() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        navigate('/pa-requests');
+        navigate('/dashboard/pa-requests');
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
         e.preventDefault();
-        navigate('/eligibility');
+        navigate('/dashboard/eligibility');
       }
     };
     window.addEventListener('keydown', handler);
@@ -216,7 +216,7 @@ export function Layout() {
         </p>
         <div className="space-y-0.5">
           <button
-            onClick={() => navigate('/pa-requests')}
+            onClick={() => navigate('/dashboard/pa-requests')}
             className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
           >
             <ClipboardList className="size-4" />
@@ -224,7 +224,7 @@ export function Layout() {
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘K</span>
           </button>
           <button
-            onClick={() => navigate('/eligibility')}
+            onClick={() => navigate('/dashboard/eligibility')}
             className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
           >
             <FileCheck className="size-4" />
@@ -264,7 +264,7 @@ export function Layout() {
             <button
               onClick={() => {
                 setUserMenuOpen(false);
-                navigate('/settings');
+                navigate('/dashboard/settings');
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
             >
@@ -275,7 +275,8 @@ export function Layout() {
             <button
               onClick={() => {
                 setUserMenuOpen(false);
-                navigate('/signin');
+                localStorage.removeItem('priorflow_authed');
+                navigate('/');
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-destructive/70 hover:bg-destructive/5 hover:text-destructive transition-colors"
             >

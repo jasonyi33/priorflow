@@ -1,5 +1,7 @@
 import { createBrowserRouter } from 'react-router';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './pages/Layout';
+import { Landing } from './pages/Landing';
 import { Home } from './pages/Home';
 import { Patients } from './pages/Patients';
 import { Eligibility } from './pages/Eligibility';
@@ -11,19 +13,25 @@ import { SignIn } from './pages/SignIn';
 import { NotFound } from './pages/NotFound';
 
 export const router = createBrowserRouter([
+  { path: '/', Component: Landing },
   { path: '/signin', Component: SignIn },
   {
-    path: '/',
-    Component: Layout,
+    path: '/dashboard',
+    Component: ProtectedRoute,
     children: [
-      { index: true, Component: Home },
-      { path: 'patients', Component: Patients },
-      { path: 'eligibility', Component: Eligibility },
-      { path: 'pa-requests', Component: PARequests },
-      { path: 'agent-activity', Component: AgentActivity },
-      { path: 'mock-portal', Component: MockPortal },
-      { path: 'settings', Component: Settings },
-      { path: '*', Component: NotFound },
+      {
+        Component: Layout,
+        children: [
+          { index: true, Component: Home },
+          { path: 'patients', Component: Patients },
+          { path: 'eligibility', Component: Eligibility },
+          { path: 'pa-requests', Component: PARequests },
+          { path: 'agent-activity', Component: AgentActivity },
+          { path: 'mock-portal', Component: MockPortal },
+          { path: 'settings', Component: Settings },
+          { path: '*', Component: NotFound },
+        ],
+      },
     ],
   },
 ]);

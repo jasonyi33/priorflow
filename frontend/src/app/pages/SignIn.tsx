@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Navigate, Link } from 'react-router';
 import { PriorFlowLogo } from '../components/priorflow-logo';
 import { api } from '../../lib/api';
 
@@ -10,10 +10,15 @@ export function SignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [apiStatus, setApiStatus] = useState<'ok' | 'offline'>('offline');
+  const isAuthed = localStorage.getItem('priorflow_authed') === 'true';
 
   useEffect(() => {
     api.getHealth().then((health) => setApiStatus(health.status));
   }, []);
+
+  if (isAuthed) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +30,8 @@ export function SignIn() {
     setLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 1200));
     setLoading(false);
-    navigate('/');
+    localStorage.setItem('priorflow_authed', 'true');
+    navigate('/dashboard');
   };
 
   return (
@@ -37,10 +43,10 @@ export function SignIn() {
 
       <div className="relative w-full max-w-sm">
         <div className="flex justify-start mb-6">
-          <a href="http://localhost:3001" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
             Back to home
-          </a>
+          </Link>
         </div>
 
         <div className="flex flex-col items-center mb-10">
