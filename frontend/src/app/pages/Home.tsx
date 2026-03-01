@@ -98,9 +98,9 @@ function PipelineStage({
         ? 'border-border bg-card'
         : 'border-border/35 bg-card/40'
     }`}>
-      {/* Stage header */}
-      <div className={`px-3 py-3 border-b ${active ? 'border-border' : 'border-border/30'}`}>
-        <div className="text-[11px] text-muted-foreground/50 tracking-[0.18em] mb-1.5 uppercase">
+      {/* Stage header — fixed height so all columns align */}
+      <div className={`px-3 py-3 border-b min-h-[64px] flex flex-col justify-center ${active ? 'border-border' : 'border-border/30'}`}>
+        <div className="text-[10px] text-muted-foreground/60 tracking-[0.18em] mb-1 uppercase truncate">
           {stage.roman} — {stage.sub}
         </div>
         <div className={`text-sm font-semibold tracking-widest uppercase ${active ? 'text-foreground' : 'text-muted-foreground/30'}`}>
@@ -130,23 +130,23 @@ function PipelineStage({
 
         {/* Request content */}
         {isDecision ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {approved > 0 && (
-              <div className="flex items-center gap-2.5 py-1">
+              <div className="flex items-center gap-2.5">
                 <Check className="size-4 flex-none text-success" />
                 <span className="text-base font-bold tabular-nums text-success">{approved}</span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">approved</span>
               </div>
             )}
             {denied > 0 && (
-              <div className="flex items-center gap-2.5 py-1">
+              <div className="flex items-center gap-2.5">
                 <X className="size-4 flex-none text-destructive" />
                 <span className="text-base font-bold tabular-nums text-destructive">{denied}</span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">denied</span>
               </div>
             )}
             {moreInfo > 0 && (
-              <div className="flex items-center gap-2.5 py-1">
+              <div className="flex items-center gap-2.5">
                 <Info className="size-4 flex-none text-warning" />
                 <span className="text-base font-bold tabular-nums text-warning">{moreInfo}</span>
                 <span className="text-xs text-muted-foreground uppercase tracking-wider">info needed</span>
@@ -161,15 +161,14 @@ function PipelineStage({
             {requests.slice(0, 3).map(req => {
               const patient = patients.find(p => p.id === req.patientId);
               return (
-                <div key={req.id} className="flex flex-col gap-1 px-3 py-3 rounded border border-border/60 bg-accent/40 min-w-0 cursor-pointer hover:bg-accent transition-colors">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div key={req.id} className="flex flex-col gap-0.5 px-2 py-2 rounded border border-border/60 bg-accent/40 min-w-0 cursor-pointer hover:bg-accent transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className={`size-2 rounded-full flex-none shrink-0 ${
                       req.status === 'pending' ? 'bg-warning animate-pulse' : 'bg-foreground/60 animate-pulse'
                     }`} />
-                    <span className="text-base font-semibold truncate leading-tight">{req.patientName}</span>
+                    <span className="text-sm font-semibold truncate leading-tight">{req.patientName}</span>
                   </div>
-                  <div className="pl-4 text-xs text-muted-foreground/60 truncate">{req.procedureCode} · {req.procedureName.split(' ').slice(0, 4).join(' ')}</div>
-                  {patient && <div className="pl-4 text-[11px] text-muted-foreground/40 truncate">{patient.insuranceProvider}</div>}
+                  <div className="pl-4 text-[11px] text-muted-foreground/70 truncate">{req.procedureCode} · {req.procedureName.split(' ').slice(0, 3).join(' ')}</div>
                 </div>
               );
             })}
@@ -216,7 +215,7 @@ function NeedsAttention({ requests, patients }: { requests: PARequest[]; patient
             const patient = patients.find(p => p.id === req.patientId);
             const isMoreInfo = req.status === 'more_info_needed';
             return (
-              <div key={req.id} className="px-5 py-5 flex items-start gap-3 hover:bg-accent/30 transition-colors cursor-pointer">
+              <div key={req.id} className="px-5 py-3.5 flex items-start gap-3 hover:bg-accent/30 transition-colors cursor-pointer">
                 <div className={`mt-1.5 size-2 rounded-full flex-none ${isMoreInfo ? 'bg-warning' : 'bg-destructive'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-1.5">
@@ -296,7 +295,8 @@ export function Home() {
 
   return (
     <div className="flex flex-col relative w-full gap-1 min-h-full">
-      <div className="min-h-full flex-1 flex flex-col gap-4 px-3 lg:px-5 py-4 ring-2 ring-pop bg-background">
+      <div className="h-3 bg-muted shrink-0" />
+      <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 ring-2 ring-pop bg-background">
 
         {/* ── Stat Bar ── */}
         <div className="grid grid-cols-3 gap-4">
@@ -417,12 +417,12 @@ export function Home() {
         </div>
 
         {/* ── Bottom: Needs Attention + Recent Cases ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[340px]">
+          <div className="lg:col-span-2 h-full">
             <NeedsAttention requests={data.paRequests} patients={data.patients} />
           </div>
 
-          <div className="lg:col-span-3 rounded border border-border bg-card overflow-hidden">
+          <div className="lg:col-span-3 rounded border border-border bg-card overflow-hidden h-full flex flex-col">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <span className="inline-block size-2 bg-foreground rounded-sm rotate-45" />
@@ -436,19 +436,19 @@ export function Home() {
             {data.paRequests.length === 0 ? (
               <div className="py-14 text-center text-sm text-muted-foreground">No cases on record</div>
             ) : (
-              <div className="divide-y divide-border">
-                <div className="grid grid-cols-12 gap-x-3 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/45 border-b border-border/50">
+              <div className="flex-1 overflow-hidden divide-y divide-border">
+                <div className="grid grid-cols-12 gap-x-3 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/45 border-b border-border/50">
                   <span className="col-span-3">Patient</span>
                   <span className="col-span-4">Procedure</span>
                   <span className="col-span-2">Insurer</span>
                   <span className="col-span-2">Status</span>
                   <span className="col-span-1 text-right">Age</span>
                 </div>
-                {data.paRequests.slice(0, 7).map(req => {
+                {data.paRequests.slice(0, 4).map(req => {
                   const cfg     = PA_STATUS_CONFIG[req.status];
                   const patient = data.patients.find(p => p.id === req.patientId);
                   return (
-                    <div key={req.id} className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors cursor-pointer">
+                    <div key={req.id} className="grid grid-cols-12 gap-x-3 items-center px-5 py-2 hover:bg-accent/35 transition-colors cursor-pointer">
                       <div className="col-span-3 min-w-0 overflow-hidden">
                         <div className="text-sm font-semibold truncate">{req.patientName}</div>
                         {patient && <div className="text-[10px] text-muted-foreground/45 truncate">{patient.memberId}</div>}

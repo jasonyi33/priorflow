@@ -21,7 +21,7 @@
   --secondary: oklch(0.944 0.026 78);
   --secondary-foreground: oklch(0.20 0.010 60);
   --muted: oklch(0.944 0.026 78);
-  --muted-foreground: oklch(0.46 0.016 70);
+  --muted-foreground: oklch(0.38 0.016 70);
   --accent: oklch(0.950 0.030 76);
   --accent-foreground: oklch(0.16 0.012 60);
   --border: oklch(0.835 0.024 78);
@@ -166,6 +166,8 @@
   * {
     @apply border-border outline-ring/50 overscroll-none;
     font-family: "Playfair Display", "Georgia", serif;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
   }
 
   body {
@@ -173,6 +175,8 @@
     font-family: "Playfair Display", "Georgia", serif;
     font-size: var(--font-size);
     line-height: 1.6;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
   /* Subtle card lift */
