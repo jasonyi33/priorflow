@@ -19,6 +19,13 @@ export interface Patient {
   insuranceProvider: string;
   chartUrl?: string;
   createdAt: string;
+  providerName?: string;
+  providerNpi?: string;
+  practiceName?: string;
+  planName?: string;
+  procedureCode?: string;
+  procedureName?: string;
+  medicationName?: string;
 }
 
 export interface EligibilityResult {
@@ -55,6 +62,14 @@ export interface AgentRun {
   completedAt?: string;
   logs: string[];
   result?: any;
+}
+
+export interface ApiHealth {
+  status: 'ok' | 'offline';
+  service: string;
+  checkedAt: string;
+  responseTimeMs?: number;
+  apiBase: string;
 }
 
 export interface DashboardMetrics {

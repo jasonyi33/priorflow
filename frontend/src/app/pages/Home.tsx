@@ -68,16 +68,18 @@ function FlowConnector({ active, throughput }: { active: boolean; throughput: nu
 
 // ─── Pipeline Stage Column ────────────────────────────────────────────────────
 function PipelineStage({
-  stage, requests, isDecision, decisionRequests, maxInStage, patients,
+  stage, requests, isDecision, decisionRequests, maxInStage,
 }: {
   stage: typeof PIPELINE_STAGES[0];
   requests: PARequest[];
   isDecision: boolean;
   decisionRequests?: PARequest[];
   maxInStage: number;
-  patients: Patient[];
 }) {
-  const displayRequests = isDecision ? (decisionRequests ?? []) : requests;
+  const sortedRequests = [...requests].sort(
+    (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+  );
+  const displayRequests = isDecision ? (decisionRequests ?? []) : sortedRequests;
   const count = displayRequests.length;
   const active = count > 0;
 
@@ -161,8 +163,7 @@ function PipelineStage({
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {requests.slice(0, 3).map(req => {
-              const patient = patients.find(p => p.id === req.patientId);
+            {sortedRequests.slice(0, 3).map(req => {
               return (
                 <div key={req.id} className="flex flex-col gap-0.5 px-2 py-2 rounded border border-border/60 bg-accent/40 min-w-0 cursor-pointer hover:bg-accent transition-colors">
                   <div className="flex items-center gap-2 min-w-0">
@@ -175,12 +176,12 @@ function PipelineStage({
                 </div>
               );
             })}
-            {requests.length > 3 && (
+            {sortedRequests.length > 3 && (
               <div className="text-xs text-muted-foreground/45 px-3 tracking-wider">
-                +{requests.length - 3} more in queue
+                +{sortedRequests.length - 3} more in queue
               </div>
             )}
-            {requests.length === 0 && (
+            {sortedRequests.length === 0 && (
               <span className="text-[10px] text-muted-foreground/25 uppercase tracking-widest">Queue empty</span>
             )}
           </div>
@@ -192,7 +193,9 @@ function PipelineStage({
 
 // ─── Needs Attention ─────────────────────────────────────────────────────────
 function NeedsAttention({ requests, patients }: { requests: PARequest[]; patients: Patient[] }) {
-  const urgent = requests.filter(r => r.status === 'more_info_needed' || r.status === 'denied');
+  const urgent = [...requests]
+    .filter(r => r.status === 'more_info_needed' || r.status === 'denied')
+    .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
   return (
     <div className="rounded border border-border bg-card overflow-hidden h-full">
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -269,6 +272,7 @@ export function Home() {
     setUploading(true);
     try {
       const result = await api.uploadPdfAndStartFlow(selected);
+      await data.refreshData();
       toast.success(
         `Intake started for ${result.mrn} (${result.patientCreated ? 'new patient' : 'updated patient'})`
       );
@@ -434,7 +438,6 @@ export function Home() {
                     isDecision={isDecision}
                     decisionRequests={isDecision ? decisionRequests : undefined}
                     maxInStage={maxInStage}
-                    patients={data.patients}
                   />
                   {hasNext && (
                     <FlowConnector

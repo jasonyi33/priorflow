@@ -8,9 +8,10 @@ import {
   PAStatus,
   AgentRun,
   DashboardMetrics,
+  ApiHealth,
 } from './types';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -26,23 +27,43 @@ async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
 function toPatient(chart: any): Patient {
   // Backend returns full PatientChart objects with nested structure
   if (chart.patient) {
+    const mrn = chart.patient.mrn;
     return {
-      id: chart.patient.mrn,
+      id: mrn,
       name: chart.patient.name,
       dateOfBirth: chart.patient.dob,
       memberId: chart.insurance.member_id,
       insuranceProvider: chart.insurance.payer,
-      createdAt: new Date().toISOString(),
+      chartUrl: `${API_BASE}/patients/${mrn}`,
+      createdAt: chart.created_at || chart.createdAt || new Date().toISOString(),
+      providerName: chart.provider?.name,
+      providerNpi: chart.provider?.npi,
+      practiceName: chart.provider?.practice,
+      planName: chart.insurance?.plan_name,
+      procedureCode: chart.procedure?.cpt,
+      procedureName: chart.procedure?.description,
+      medicationName: chart.medication?.name,
     };
   }
   // Convex format uses flat camelCase fields
+  const mrn = chart.mrn || chart._id;
   return {
-    id: chart.mrn || chart._id,
+    id: mrn,
     name: `${chart.firstName} ${chart.lastName}`,
     dateOfBirth: chart.dob,
     memberId: chart.insurance?.memberId || '',
     insuranceProvider: chart.insurance?.payer || '',
-    createdAt: chart._creationTime ? new Date(chart._creationTime).toISOString() : new Date().toISOString(),
+    chartUrl: chart.chartJson || chart.mrn ? `${API_BASE}/patients/${mrn}` : undefined,
+    createdAt: chart._creationTime
+      ? new Date(chart._creationTime).toISOString()
+      : chart.createdAt || new Date().toISOString(),
+    providerName: chart.provider?.name,
+    providerNpi: chart.provider?.npi,
+    practiceName: chart.provider?.practice,
+    planName: chart.insurance?.planName || chart.insurance?.plan_name,
+    procedureCode: chart.procedure?.cpt,
+    procedureName: chart.procedure?.description,
+    medicationName: chart.medication?.name,
   };
 }
 
@@ -83,6 +104,7 @@ function toPARequest(data: any): PARequest {
     status: PA_STATUS_MAP[data.status] || 'pending',
     submittedAt: data.created_at,
     lastUpdated: data.updated_at || data.created_at,
+    agentRunId: data.run_id || data.runId || undefined,
     denialReason: data.gaps_detected?.length ? data.gaps_detected.join(', ') : undefined,
     approvalCode: data.submission_id,
   };
@@ -244,7 +266,9 @@ export const api = {
     });
 
     await Promise.all(fetches);
-    return results;
+    return results.sort(
+      (a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime()
+    );
   },
 
   async checkEligibility(patientId: string): Promise<EligibilityResult> {
@@ -295,7 +319,7 @@ export const api = {
       const pa = toPARequest(item);
       pa.patientName = getPatientName(patients, pa.patientId);
       return pa;
-    });
+    }).sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
   },
 
   async getPARequest(id: string): Promise<PARequest | undefined> {
@@ -340,7 +364,7 @@ export const api = {
       const run = toAgentRun(item);
       run.patientName = getPatientName(patients, run.patientId);
       return run;
-    });
+    }).sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
   },
 
   async getAgentRun(id: string): Promise<AgentRun | undefined> {
@@ -352,6 +376,29 @@ export const api = {
       return run;
     } catch {
       return undefined;
+    }
+  },
+
+  async getHealth(): Promise<ApiHealth> {
+    const startedAt = performance.now();
+
+    try {
+      const data = await fetchJSON<{ status?: string; service?: string }>('/health');
+      return {
+        status: data.status === 'ok' ? 'ok' : 'offline',
+        service: data.service || 'priorflow',
+        checkedAt: new Date().toISOString(),
+        responseTimeMs: Math.round(performance.now() - startedAt),
+        apiBase: API_BASE,
+      };
+    } catch {
+      return {
+        status: 'offline',
+        service: 'priorflow',
+        checkedAt: new Date().toISOString(),
+        responseTimeMs: Math.round(performance.now() - startedAt),
+        apiBase: API_BASE,
+      };
     }
   },
 };
