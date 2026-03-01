@@ -77,19 +77,23 @@ function toPatient(chart: any): Patient {
 }
 
 function toEligibilityResult(data: any, patientName?: string): EligibilityResult {
+  const paRequired = data.pa_required ?? data.paRequired;
+  const paReason = data.pa_required_reason ?? data.paRequiredReason;
+  const checkedAt = data.checked_at ?? data.checkedAt;
+  const coverageActive = data.coverage_active ?? data.coverageActive;
   const details = [
     data.copay,
     data.deductible,
-    data.pa_required ? `PA required: ${data.pa_required_reason || 'yes'}` : null,
+    paRequired ? `PA required: ${paReason || 'yes'}` : null,
   ].filter(Boolean).join(' — ');
 
   return {
-    id: `eli-${data.mrn}-${data.checked_at || Date.now()}`,
+    id: `eli-${data.mrn}-${checkedAt || Date.now()}`,
     patientId: data.mrn,
     patientName: patientName || data.mrn,
-    isEligible: data.coverage_active,
+    isEligible: Boolean(coverageActive),
     coverageDetails: details || undefined,
-    checkDate: toISOString(data.checked_at),
+    checkDate: toISOString(checkedAt),
     insuranceProvider: data.payer,
   };
 }
@@ -104,18 +108,23 @@ const PA_STATUS_MAP: Record<string, PAStatus> = {
 };
 
 function toPARequest(data: any): PARequest {
+  const medicationOrProcedure = data.medication_or_procedure || data.medicationOrProcedure || '';
+  const createdAt = data.created_at || data.createdAt;
+  const updatedAt = data.updated_at || data.updatedAt || createdAt;
+  const gapsDetected = data.gaps_detected || data.gapsDetected || [];
+  const submissionId = data.submission_id || data.submissionId;
   return {
-    id: data.id || data.submission_id || `pa-${data.mrn}`,
+    id: data.id || data._id || submissionId || `pa-${data.mrn}`,
     patientId: data.mrn,
     patientName: data.mrn,
     procedureCode: data.diagnosis?.icd10 || '',
-    procedureName: data.medication_or_procedure || '',
+    procedureName: medicationOrProcedure,
     status: PA_STATUS_MAP[data.status] || 'pending',
-    submittedAt: toISOString(data.created_at),
-    lastUpdated: toISOString(data.updated_at || data.created_at),
+    submittedAt: toISOString(createdAt),
+    lastUpdated: toISOString(updatedAt),
     agentRunId: data.run_id || data.runId || undefined,
-    denialReason: data.gaps_detected?.length ? data.gaps_detected.join(', ') : undefined,
-    approvalCode: data.submission_id,
+    denialReason: gapsDetected.length ? gapsDetected.join(', ') : undefined,
+    approvalCode: submissionId,
   };
 }
 
