@@ -263,7 +263,6 @@ async def _persist_patient_to_convex(chart: dict[str, Any], patient_created: boo
                 "bin": chart_model.insurance.bin,
                 "pcn": chart_model.insurance.pcn,
                 "rxGroup": chart_model.insurance.rx_group,
-                "planName": chart_model.insurance.plan_name,
             },
             "diagnosis": {
                 "icd10": chart_model.diagnosis.icd10,
@@ -281,13 +280,16 @@ async def _persist_patient_to_convex(chart: dict[str, Any], patient_created: boo
             },
             "chartJson": chart_model.model_dump_json(),
         }
+        if chart_model.insurance.plan_name:
+            args["insurance"]["planName"] = chart_model.insurance.plan_name
         if chart_model.medication:
             args["medication"] = {
                 "name": chart_model.medication.name,
-                "ndc": chart_model.medication.ndc,
                 "dose": chart_model.medication.dose,
                 "frequency": chart_model.medication.frequency,
             }
+            if chart_model.medication.ndc:
+                args["medication"]["ndc"] = chart_model.medication.ndc
         if chart_model.procedure:
             args["procedure"] = {
                 "cpt": chart_model.procedure.cpt,

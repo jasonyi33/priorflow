@@ -144,6 +144,33 @@ def _is_live_execution(agent_type: AgentType) -> bool:
     return ENABLE_AGENT_EXECUTION
 
 
+def _artifact_path_for(agent_type: AgentType, mrn: str) -> Optional[Path]:
+    mapping = {
+        AgentType.ELIGIBILITY: OUTPUT_DIR / f"eligibility_{mrn}.json",
+        AgentType.PA_FORM_FILLER: OUTPUT_DIR / f"pa_submission_{mrn}.json",
+        AgentType.STATUS_MONITOR: OUTPUT_DIR / f"status_{mrn}.json",
+    }
+    return mapping.get(agent_type)
+
+
+def _artifact_written_after_start(run_state: dict) -> bool:
+    try:
+        agent_type = AgentType(run_state["agent_type"])
+        mrn = str(run_state["mrn"])
+        started_at = datetime.fromisoformat(str(run_state["started_at"]))
+    except Exception:
+        return False
+
+    artifact = _artifact_path_for(agent_type, mrn)
+    if artifact is None or not artifact.exists():
+        return False
+    try:
+        written_at = datetime.fromtimestamp(artifact.stat().st_mtime, tz=UTC)
+    except Exception:
+        return False
+    return written_at >= started_at
+
+
 def _log_step(run_id: str, message: str):
     """Append a timestamped log entry to a run's activity log."""
     state = _run_states.get(run_id)
@@ -306,9 +333,14 @@ async def _run_status_check(mrn: str, portal: Portal):
         patient_name = _lookup_patient_name(mrn)
         if run_id:
             _log_step(run_id, f"Connecting to CoverMyMeds to check status for {patient_name}")
-        await monitor_covermymeds(mrn, patient_name)
+        result = await monitor_covermymeds(mrn, patient_name)
+        if not result:
+            raise RuntimeError(f"Status monitor returned empty result for {mrn}")
         if run_id:
             _log_step(run_id, "Status check response received from portal")
+        output_file = OUTPUT_DIR / f"status_{mrn}.json"
+        if not output_file.exists():
+            raise RuntimeError(f"Status output file was not created for {mrn}")
     else:
         if run_id:
             _log_step(run_id, "Using fixture data (ENABLE_AGENT_EXECUTION=false)")
@@ -338,22 +370,25 @@ def _lookup_patient_name(mrn: str) -> str:
 async def _persist_run(run: AgentRun):
     if convex_client.enabled:
         try:
-            doc_id = await convex_client.mutation(
-                "agentRuns:create",
-                {
-                    "runId": run.id,
-                    "agentType": run.agent_type.value,
-                    "mrn": run.mrn,
-                    "portal": run.portal.value,
-                    "startedAt": int(run.started_at.timestamp() * 1000),
-                    "completedAt": None,
-                    "stepsTaken": run.steps_taken,
-                    "maxSteps": run.max_steps,
-                    "success": None,
-                    "errorMessage": None,
-                    "gifPath": run.gif_path,
-                },
-            )
+            payload = {
+                "runId": run.id,
+                "agentType": run.agent_type.value,
+                "mrn": run.mrn,
+                "portal": run.portal.value,
+                "startedAt": int(run.started_at.timestamp() * 1000),
+                "stepsTaken": run.steps_taken,
+                "maxSteps": run.max_steps,
+            }
+            if run.completed_at is not None:
+                payload["completedAt"] = int(run.completed_at.timestamp() * 1000)
+            if run.success is not None:
+                payload["success"] = run.success
+            if run.error_message:
+                payload["errorMessage"] = run.error_message
+            if run.gif_path:
+                payload["gifPath"] = run.gif_path
+
+            doc_id = await convex_client.mutation("agentRuns:create", payload)
             if doc_id:
                 _convex_run_doc_ids[run.id] = str(doc_id)
             return
@@ -384,9 +419,8 @@ async def _complete_run(run_id: str, success: bool, error: Optional[str] = None)
                         "id": convex_doc_id,
                         "completedAt": int(completed_at.timestamp() * 1000),
                         "stepsTaken": 0,
-                        "success": success,
-                        "errorMessage": error,
-                        "gifPath": None,
+                        **({"success": success} if success is not None else {}),
+                        **({"errorMessage": error} if error else {}),
                     },
                 )
         except Exception:
@@ -486,7 +520,7 @@ async def get_run_status(run_id: str) -> Optional[dict]:
         task = _running_tasks.get(run_id)
         state = dict(_run_states[run_id])
         if task is not None:
-            if task.done() and state["status"] == "started":
+            if task.done() and state["status"] in ("started", "retrying"):
                 exc = task.exception() if not task.cancelled() else None
                 state["status"] = "failed" if exc else "completed"
                 if exc:
@@ -518,7 +552,26 @@ async def get_run_status(run_id: str) -> Optional[dict]:
 async def wait_for_run(run_id: str) -> Optional[dict]:
     task = _running_tasks.get(run_id)
     if task:
-        await task
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=AGENT_RUN_TIMEOUT + 30)
+        except TimeoutError:
+            state = _run_states.get(run_id)
+            if state and _artifact_written_after_start(state):
+                _log_step(
+                    run_id,
+                    "Timed out waiting for task callback, but fresh output artifact exists; marking completed",
+                )
+                await _complete_run(run_id, success=True)
+            else:
+                _log_step(
+                    run_id,
+                    "Timed out waiting for task completion and no fresh output artifact was found",
+                )
+                await _complete_run(
+                    run_id,
+                    success=False,
+                    error="Timed out waiting for task completion",
+                )
     return await get_run_status(run_id)
 
 
