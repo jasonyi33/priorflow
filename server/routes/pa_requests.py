@@ -32,50 +32,60 @@ async def trigger_pa_submission(req: TriggerPARequest) -> APIResponse:
 
 @router.get("")
 async def list_pa_requests(mrn: Optional[str] = None, status: Optional[str] = None) -> list[dict]:
+    """List PA requests. Convex-first with local file fallback when Convex is disabled."""
+
+    if convex_client.enabled:
+        try:
+            results = list(await convex_client.query("paRequests:list") or [])
+        except Exception:
+            logger.warning("Convex query failed for paRequests", exc_info=True)
+            results = []
+
+        # Overlay in-memory orchestrator results for submissions not yet persisted
+        seen_keys = {(r.get("mrn"), r.get("portal")) for r in results}
+        for pa_data in orchestrator._pa_results.values():
+            key = (pa_data.get("mrn"), pa_data.get("portal"))
+            if key not in seen_keys:
+                results.append(pa_data)
+                seen_keys.add(key)
+
+        if mrn:
+            results = [r for r in results if r.get("mrn") == mrn]
+        if status:
+            results = [r for r in results if r.get("status") == status]
+        return results
+
+    # Convex disabled — fall back to local files
     results: list[dict] = []
     seen_keys: set[tuple[str, str]] = set()
 
-    def append_result(item: dict):
-        item_mrn = item.get("mrn", "")
-        item_portal = item.get("portal", "")
-        if mrn and item_mrn != mrn:
-            return
-        if status and item.get("status") != status:
-            return
-        key = (item_mrn, item_portal)
-        if key in seen_keys:
-            return
-        seen_keys.add(key)
-        results.append(item)
-
-    # 1. In-memory PA results from orchestrator (most up-to-date)
     for pa_data in orchestrator._pa_results.values():
-        append_result(pa_data)
+        key = (pa_data.get("mrn", ""), pa_data.get("portal", ""))
+        if key not in seen_keys:
+            results.append(pa_data)
+            seen_keys.add(key)
 
-    # 2. Local output fallback/overlay for direct script runs
     for output_file in sorted(OUTPUT_DIR.glob("pa_submission_*.json"), reverse=True):
         try:
             with open(output_file) as f:
-                append_result(json.load(f))
+                data = json.load(f)
+            key = (data.get("mrn", ""), data.get("portal", ""))
+            if key not in seen_keys:
+                results.append(data)
+                seen_keys.add(key)
         except Exception:
             logger.warning("Failed to read %s", output_file, exc_info=True)
 
-    # 3. Convex for persisted requests across processes
-    if convex_client.enabled:
-        try:
-            data = await convex_client.query("paRequests:list")
-            for item in data or []:
-                append_result(item)
-        except Exception:
-            logger.warning("Convex query failed for paRequests", exc_info=True)
-
-    # 4. Fixture fallback only in local demo mode
-    if not results and not convex_client.enabled:
+    if not results:
         fixture_file = FIXTURES_DIR / "pa_submission_sample.json"
         if fixture_file.exists():
             with open(fixture_file) as f:
-                append_result(json.load(f))
+                results.append(json.load(f))
 
+    if mrn:
+        results = [r for r in results if r.get("mrn") == mrn]
+    if status:
+        results = [r for r in results if r.get("status") == status]
     return results
 
 
