@@ -1,33 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileCheck, 
-  ClipboardList, 
-  Activity, 
-  Lock,
+import {
+  LayoutDashboard,
+  Users,
+  FileCheck,
+  ClipboardList,
+  Activity,
   Globe,
   Menu,
   X,
   ChevronRight,
-  ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
   LogOut,
-  CircleCheck,
-  Clock,
-  TrendingUp,
-  Bot,
 } from 'lucide-react';
-import { cn } from '../components/ui/utils';
 import { AnimatePresence, motion } from 'motion/react';
+import { cn } from '../components/ui/utils';
 import TVNoise from '../components/tv-noise';
 import { PriorFlowLogo, PriorFlowMark } from '../components/priorflow-logo';
-import { usePADashboard, PADashboardContext } from '../../lib/hooks';
+import { PADashboardContext, usePADashboard } from '../../lib/hooks';
+import { buildLiveNotifications, getInitials, getPrimaryProvider } from '../../lib/dashboard';
 
-// ─── NAVIGATION DATA ───
 const navigation = [
   { name: 'DASHBOARD', href: '/', icon: LayoutDashboard },
   { name: 'PATIENTS', href: '/patients', icon: Users },
@@ -37,77 +31,16 @@ const navigation = [
   { name: 'MOCK PORTAL', href: '/mock-portal', icon: Globe },
 ];
 
-// ─── NOTIFICATION DATA ───
 interface Notification {
   id: string;
   title: string;
   message: string;
   timestamp: string;
   type: 'info' | 'warning' | 'success' | 'error';
-  read: boolean;
   priority: 'low' | 'medium' | 'high';
+  read: boolean;
 }
 
-const initialNotifications: Notification[] = [
-  {
-    id: 'notif-1',
-    title: 'PA APPROVED',
-    message: 'Prior auth for Jane Doe (Humira) approved by Aetna.',
-    timestamp: '2025-02-28T13:39:00Z',
-    type: 'success',
-    read: false,
-    priority: 'medium',
-  },
-  {
-    id: 'notif-2',
-    title: 'ELIGIBILITY VERIFIED',
-    message: 'Coverage confirmed for John Smith - United Healthcare.',
-    timestamp: '2025-02-28T13:35:00Z',
-    type: 'info',
-    read: false,
-    priority: 'low',
-  },
-  {
-    id: 'notif-3',
-    title: 'AGENT COMPLETED',
-    message: 'Eligibility check bot finished for patient MRN-00421.',
-    timestamp: '2025-02-28T12:15:00Z',
-    type: 'info',
-    read: true,
-    priority: 'medium',
-  },
-  {
-    id: 'notif-4',
-    title: 'INFO REQUEST',
-    message: 'Aetna requesting additional clinical notes for PA #4821.',
-    timestamp: '2025-02-28T11:45:00Z',
-    type: 'warning',
-    read: true,
-    priority: 'high',
-  },
-];
-
-// ─── WIDGET DATA ───
-function getTimezoneAbbr(): string {
-  const formatter = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' });
-  const parts = formatter.formatToParts(new Date());
-  const tzPart = parts.find((p) => p.type === 'timeZoneName');
-  return tzPart?.value ?? 'UTC';
-}
-
-const widgetData = {
-  location: 'PriorFlow HQ',
-  timezone: getTimezoneAbbr(),
-};
-
-// ─── CHAT DATA ───
-const chatContacts = [
-  { id: 'alpha', name: 'AGENT ALPHA', handle: '@ALPHA', lastMessage: 'PA #4821 SUBMITTED TO AETNA', time: '4:00 PM', unread: 1, online: true },
-  { id: 'rivera', name: 'DR. RIVERA', handle: '@MRIVERA', lastMessage: 'NEED CHART REVIEW FOR DOE, JANE', time: 'Yesterday', unread: 0, online: false },
-  { id: 'beta', name: 'AGENT BETA', handle: '@BETA', lastMessage: 'RUN ELIGIBILITY CHECK', time: 'Yesterday', unread: 0, online: true },
-];
-
-// ─── HELPERS ───
 function formatTimestamp(timestamp: string) {
   const date = new Date(timestamp);
   const now = new Date();
@@ -119,12 +52,23 @@ function formatTimestamp(timestamp: string) {
   return date.toLocaleDateString();
 }
 
+function getTimezoneAbbr(): string {
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' });
+  const parts = formatter.formatToParts(new Date());
+  const tzPart = parts.find((part) => part.type === 'timeZoneName');
+  return tzPart?.value ?? 'UTC';
+}
+
 function getTypeColor(type: Notification['type']) {
   switch (type) {
-    case 'success': return 'bg-green-500';
-    case 'warning': return 'bg-yellow-500';
-    case 'error': return 'bg-red-500';
-    default: return 'bg-blue-500';
+    case 'success':
+      return 'bg-green-500';
+    case 'warning':
+      return 'bg-yellow-500';
+    case 'error':
+      return 'bg-red-500';
+    default:
+      return 'bg-blue-500';
   }
 }
 
@@ -139,10 +83,6 @@ function getPriorityBadge(priority: Notification['priority']) {
   }
 }
 
-// ═══════════════════════════════════════════════════
-// LAYOUT
-// ═══════════════════════════════════════════════════
-
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -150,71 +90,85 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
-  const [chatExpanded, setChatExpanded] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [readIds, setReadIds] = useState<Record<string, boolean>>({});
+  const [dismissedIds, setDismissedIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); navigate('/pa-requests'); }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'e') { e.preventDefault(); navigate('/eligibility'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        navigate('/pa-requests');
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
+        e.preventDefault();
+        navigate('/eligibility');
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [navigate]);
 
+  const providerSummary = useMemo(
+    () => getPrimaryProvider(dashboardData.patients),
+    [dashboardData.patients]
+  );
+
+  const liveNotifications = useMemo(
+    () => buildLiveNotifications({
+      paRequests: dashboardData.paRequests,
+      agentRuns: dashboardData.agentRuns,
+      eligibilityResults: dashboardData.eligibilityResults,
+    }),
+    [dashboardData.agentRuns, dashboardData.eligibilityResults, dashboardData.paRequests]
+  );
+
+  const notifications = useMemo<Notification[]>(
+    () =>
+      liveNotifications
+        .filter((notification) => !dismissedIds[notification.id])
+        .map((notification) => ({
+          ...notification,
+          read: !!readIds[notification.id],
+        })),
+    [dismissedIds, liveNotifications, readIds]
+  );
+
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const displayedNotifications = showAllNotifications ? notifications : notifications.slice(0, 3);
+
   const closeSidebar = () => setSidebarOpen(false);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const displayedNotifications = showAllNotifications
-    ? notifications
-    : notifications.slice(0, 3);
-
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const markAsRead = (id: string) => setReadIds((prev) => ({ ...prev, [id]: true }));
+  const deleteNotification = (id: string) => setDismissedIds((prev) => ({ ...prev, [id]: true }));
+  const clearAll = () => {
+    const nextDismissed: Record<string, boolean> = {};
+    for (const notification of liveNotifications) {
+      nextDismissed[notification.id] = true;
+    }
+    setDismissedIds((prev) => ({ ...prev, ...nextDismissed }));
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  const clearAll = () => setNotifications([]);
-
-  // ─── Format helpers ───
   const formatTime = (date: Date) =>
     date.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' });
 
-  const formatDate = (date: Date) => {
-    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const restOfDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    return { dayOfWeek, restOfDate };
-  };
+  const formatDate = (date: Date) => ({
+    dayOfWeek: date.toLocaleDateString('en-US', { weekday: 'long' }),
+    restOfDate: date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+  });
 
   const dateInfo = formatDate(currentTime);
+  const shellTitle = providerSummary.providerName?.toUpperCase() || 'LIVE OPERATIONS';
+  const shellSubtitle = providerSummary.practiceName || `${dashboardData.totalPatients} patients synced`;
+  const shellInitials = getInitials(providerSummary.providerName || providerSummary.practiceName || 'PriorFlow');
 
-  // ─── Sidebar stats derived from dashboard data ───
-  const sidebarStats = [
-    { label: 'APPROVED', value: String(dashboardData.approvedCount), icon: CircleCheck, color: 'text-success', bgColor: 'bg-success/10' },
-    { label: 'PENDING', value: String(dashboardData.pendingCount), icon: Clock, color: 'text-warning', bgColor: 'bg-warning/10' },
-    { label: 'APPROVAL', value: `${dashboardData.approvalRate}%`, icon: TrendingUp, color: 'text-primary', bgColor: 'bg-primary/10' },
-    { label: 'AGENTS', value: `${dashboardData.activeAgents}/${dashboardData.totalAgentSlots}`, icon: Bot, color: 'text-success', bgColor: 'bg-success/10' },
-  ];
-
-  // ═══════════════════════════════════════════════
-  // SIDEBAR CONTENT
-  // ═══════════════════════════════════════════════
   const SidebarContent = () => (
     <div className="flex h-full flex-col p-2 gap-2">
-      {/* Brand + Collapse toggle */}
       <div className="flex items-center gap-2 px-1 pt-1 pb-1">
         <div className="flex items-center justify-center rounded-md px-1">
           <PriorFlowLogo className="h-5 w-auto" />
@@ -229,7 +183,6 @@ export function Layout() {
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="space-y-0.5">
         <p className="px-2.5 pb-1.5 pt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
           NAVIGATION
@@ -246,31 +199,34 @@ export function Layout() {
                 'group/nav relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider transition-all',
                 isActive
                   ? 'bg-primary text-primary-foreground font-semibold shadow-sm'
-                  : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-                item.locked && 'pointer-events-none opacity-40'
+                  : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground'
               )}
             >
               <Icon className="size-4" />
               <span className="flex-1">{item.name}</span>
-              {item.locked && <Lock className="size-3 opacity-50" />}
               {isActive && <ChevronRight className="size-3 opacity-60" />}
             </Link>
           );
         })}
       </nav>
 
-      {/* Quick Actions */}
       <div className="mt-1">
         <p className="px-2.5 pb-1.5 pt-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
           QUICK ACTIONS
         </p>
         <div className="space-y-0.5">
-          <button onClick={() => navigate('/pa-requests')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button
+            onClick={() => navigate('/pa-requests')}
+            className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          >
             <ClipboardList className="size-4" />
             <span className="flex-1 text-left">NEW PA REQUEST</span>
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘K</span>
           </button>
-          <button onClick={() => navigate('/eligibility')} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+          <button
+            onClick={() => navigate('/eligibility')}
+            className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          >
             <FileCheck className="size-4" />
             <span className="flex-1 text-left">CHECK ELIGIBILITY</span>
             <span className="text-[9px] text-muted-foreground/40 bg-muted px-1.5 py-0.5 rounded tracking-wider">⌘E</span>
@@ -278,10 +234,8 @@ export function Layout() {
         </div>
       </div>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* User Section */}
       <div className="relative">
         <button
           onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -289,29 +243,42 @@ export function Layout() {
         >
           <div className="relative shrink-0">
             <div className="size-9 rounded-md bg-primary text-primary-foreground flex items-center justify-center">
-              <span className="text-[10px] font-bold">SC</span>
+              <span className="text-[10px] font-bold">{shellInitials}</span>
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 size-2.5 bg-success rounded-full border-2 border-card" />
           </div>
           <div className="flex-1 min-w-0 text-left">
-            <div className="text-xs font-semibold tracking-wide truncate">DR. S. CHEN</div>
-            <div className="text-[10px] text-muted-foreground/50 truncate">s.chen@priorflow.io</div>
+            <div className="text-xs font-semibold tracking-wide truncate">{shellTitle}</div>
+            <div className="text-[10px] text-muted-foreground/50 truncate">{shellSubtitle}</div>
           </div>
-          <ChevronRight className={cn(
-            'size-3.5 text-muted-foreground/40 transition-transform duration-200',
-            userMenuOpen && 'rotate-90'
-          )} />
+          <ChevronRight
+            className={cn(
+              'size-3.5 text-muted-foreground/40 transition-transform duration-200',
+              userMenuOpen && 'rotate-90'
+            )}
+          />
         </button>
 
-        {/* User dropdown */}
         {userMenuOpen && (
           <div className="absolute bottom-full left-0 right-0 mb-1 rounded-md border border-border bg-card shadow-lg overflow-hidden z-10">
-            <button onClick={() => { setUserMenuOpen(false); navigate('/settings'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+            <button
+              onClick={() => {
+                setUserMenuOpen(false);
+                navigate('/settings');
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+            >
               <Settings className="size-3.5" />
               SETTINGS
             </button>
             <div className="border-t border-border" />
-            <button onClick={() => { setUserMenuOpen(false); navigate('/signin'); }} className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-destructive/70 hover:bg-destructive/5 hover:text-destructive transition-colors">
+            <button
+              onClick={() => {
+                setUserMenuOpen(false);
+                navigate('/signin');
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-wider text-destructive/70 hover:bg-destructive/5 hover:text-destructive transition-colors"
+            >
               <LogOut className="size-3.5" />
               SIGN OUT
             </button>
@@ -319,32 +286,36 @@ export function Layout() {
         )}
       </div>
 
-      {/* Version */}
       <div className="px-2 pb-1">
-        <span className="text-[9px] text-muted-foreground/30 tracking-wider">PRIORFLOW v2.4.1</span>
+        <span className="text-[9px] text-muted-foreground/30 tracking-wider">
+          PRIORFLOW v{__APP_VERSION__}
+        </span>
       </div>
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // COLLAPSED SIDEBAR (icon strip)
-  // ═══════════════════════════════════════════════
   const CollapsedSidebar = () => (
     <div className="flex flex-col items-center py-2 gap-1.5">
-      {/* Expand button at top */}
-      <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
-        className="flex items-center justify-center size-8 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition-colors mb-1">
+      <button
+        onClick={() => setSidebarCollapsed(false)}
+        title="Expand sidebar"
+        className="flex items-center justify-center size-8 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition-colors mb-1"
+      >
         <PanelLeftOpen className="size-4" />
       </button>
       {navigation.map((item) => {
         const isActive = location.pathname === item.href;
         const Icon = item.icon;
         return (
-          <Link key={item.name} to={item.href} title={item.name}
+          <Link
+            key={item.name}
+            to={item.href}
+            title={item.name}
             className={cn(
               'flex items-center justify-center size-8 rounded-md transition-colors',
-              isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground',
-              item.locked && 'pointer-events-none opacity-30'
+              isActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground'
             )}
           >
             <Icon className="size-4" />
@@ -354,9 +325,6 @@ export function Layout() {
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // WIDGET (Right Panel Top)
-  // ═══════════════════════════════════════════════
   const WidgetSection = () => (
     <div className="w-full aspect-[2] relative overflow-hidden rounded-lg border border-border bg-card">
       <TVNoise opacity={0.3} intensity={0.2} speed={40} />
@@ -372,47 +340,46 @@ export function Layout() {
         </div>
         <div className="flex justify-between items-center text-[10px] font-medium uppercase mt-3">
           <span className="opacity-50">{dashboardData.queueDepth} queued</span>
-          <span className="opacity-50">{widgetData.timezone}</span>
+          <span className="opacity-50">
+            {dashboardData.health.status === 'ok' ? 'API LIVE' : 'API OFFLINE'} · {getTimezoneAbbr()}
+          </span>
         </div>
-
-        {/* Background grid pattern */}
-        <div className="absolute inset-0 -z-[1] opacity-[0.08]" style={{
-          backgroundImage: `
-            linear-gradient(to right, currentColor 1px, transparent 1px),
-            linear-gradient(to bottom, currentColor 1px, transparent 1px)
-          `,
-          backgroundSize: '24px 24px',
-        }} />
+        <div
+          className="absolute inset-0 -z-[1] opacity-[0.08]"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, currentColor 1px, transparent 1px),
+              linear-gradient(to bottom, currentColor 1px, transparent 1px)
+            `,
+            backgroundSize: '24px 24px',
+          }}
+        />
       </div>
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // NOTIFICATION ITEM
-  // ═══════════════════════════════════════════════
   const NotificationItem = ({ notification }: { notification: Notification }) => (
     <div
       className={cn(
         'group p-2.5 rounded-lg border transition-all duration-200 hover:shadow-sm',
         !notification.read && 'cursor-pointer',
-        notification.read
-          ? 'bg-card/50 border-border/30'
-          : 'bg-card border-border shadow-sm'
+        notification.read ? 'bg-card/50 border-border/30' : 'bg-card border-border shadow-sm'
       )}
-      onClick={() => { if (!notification.read) markAsRead(notification.id); }}
+      onClick={() => {
+        if (!notification.read) {
+          markAsRead(notification.id);
+        }
+      }}
     >
       <div className="flex items-start gap-2.5">
         <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', getTypeColor(notification.type))} />
         <div className="flex-1 min-w-0">
-          {/* Title — full width, no truncation */}
           <h4 className={cn('text-sm leading-snug mb-1', !notification.read ? 'font-semibold' : 'font-medium')}>
             {notification.title}
           </h4>
-          {/* Message clamped to 1 line */}
           <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">
             {notification.message}
           </p>
-          {/* Badge + timestamp + clear on one row */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               {getPriorityBadge(notification.priority)}
@@ -421,7 +388,10 @@ export function Layout() {
               </span>
             </div>
             <button
-              onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteNotification(notification.id);
+              }}
               className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-destructive"
             >
               clear
@@ -432,12 +402,8 @@ export function Layout() {
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // NOTIFICATIONS SECTION
-  // ═══════════════════════════════════════════════
   const NotificationsSection = () => (
     <div className="flex-1 flex flex-col rounded-lg border border-border bg-card overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <div className="flex items-center gap-2.5 text-sm font-medium uppercase">
           {unreadCount > 0 ? (
@@ -459,7 +425,6 @@ export function Layout() {
         )}
       </div>
 
-      {/* Content */}
       <div className="flex-1 bg-accent p-1.5 overflow-auto">
         <div className="space-y-2">
           <AnimatePresence initial={false} mode="popLayout">
@@ -478,7 +443,9 @@ export function Layout() {
 
             {notifications.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">No notifications</p>
+                <p className="text-sm text-muted-foreground">
+                  {dashboardData.loading ? 'Loading notifications…' : 'No live events yet'}
+                </p>
               </div>
             )}
 
@@ -505,111 +472,6 @@ export function Layout() {
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // CHAT SECTION
-  // ═══════════════════════════════════════════════
-  const totalChatUnread = chatContacts.reduce((sum, c) => sum + c.unread, 0);
-
-  const ChatSection = () => (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
-      {/* Chat Header / Toggle */}
-      <button
-        onClick={() => setChatExpanded(!chatExpanded)}
-        className={cn(
-          'w-full flex items-center gap-3 px-4 py-3 transition-colors',
-          chatExpanded ? 'border-b border-border' : '',
-          'hover:bg-accent/50'
-        )}
-      >
-        {totalChatUnread > 0 && (
-          <span className="inline-flex items-center justify-center size-6 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">
-            {totalChatUnread}
-          </span>
-        )}
-        <span className="flex-1 text-left text-sm font-medium uppercase tracking-wider">
-          {totalChatUnread > 0
-            ? `New Message${totalChatUnread > 1 ? 's' : ''}`
-            : 'Messages'}
-        </span>
-        <X
-          className={cn(
-            'size-4 text-muted-foreground transition-transform duration-200',
-            !chatExpanded && 'rotate-45'
-          )}
-        />
-      </button>
-
-      {/* Chat Contacts — CSS transition (no AnimatePresence flicker) */}
-      <div
-        className={cn(
-          'transition-[max-height,opacity] duration-300 ease-out overflow-hidden',
-          chatExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
-        )}
-      >
-        <div className="bg-accent p-2 space-y-2">
-          {chatContacts.map((contact) => (
-            <div
-              key={contact.id}
-              className={cn(
-                'flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer',
-                contact.unread > 0
-                  ? 'bg-card border-border shadow-sm'
-                  : 'bg-card/50 border-border/30 hover:bg-card hover:border-border'
-              )}
-            >
-              {/* Avatar with online indicator */}
-              <div className="relative shrink-0">
-                <div className="size-12 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <span className="text-[10px] font-bold text-primary leading-tight text-center tracking-wider">
-                    {contact.name
-                      .split(' ')
-                      .filter((w) => w.length > 1)
-                      .slice(0, 2)
-                      .map((w) => w[0])
-                      .join('')}
-                  </span>
-                </div>
-                {contact.online && (
-                  <span className="absolute -bottom-0.5 -left-0.5 size-2.5 bg-green-500 rounded-full border-2 border-card" />
-                )}
-              </div>
-
-              {/* Name + Message */}
-              <div className="flex-1 min-w-0 py-0.5">
-                <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span
-                    className={cn(
-                      'text-sm tracking-wide truncate',
-                      contact.unread > 0 ? 'font-bold' : 'font-medium'
-                    )}
-                  >
-                    {contact.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground/50 shrink-0 whitespace-nowrap">
-                    {contact.time}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground truncate leading-relaxed">
-                  {contact.lastMessage}
-                </p>
-              </div>
-
-              {/* Unread badge */}
-              {contact.unread > 0 && (
-                <span className="inline-flex items-center justify-center size-6 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0 mt-1">
-                  {contact.unread}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ═══════════════════════════════════════════════
-  // RIGHT PANEL
-  // ═══════════════════════════════════════════════
   const RightPanel = () => (
     <div className="flex flex-col h-screen sticky top-0 overflow-hidden px-3 py-sides gap-3">
       <WidgetSection />
@@ -617,35 +479,33 @@ export function Layout() {
     </div>
   );
 
-  // ═══════════════════════════════════════════════
-  // MAIN LAYOUT
-  // ═══════════════════════════════════════════════
   return (
     <PADashboardContext.Provider value={dashboardData}>
       <div className="flex w-full min-h-screen">
-        {/* Mobile overlay */}
         {sidebarOpen && (
-          <div 
-            className="fixed inset-0 z-40 bg-black/50 lg:hidden" 
+          <div
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
             onClick={closeSidebar}
           />
         )}
 
-        {/* Left Sidebar - Desktop */}
-        <aside className={cn(
-          'hidden lg:flex flex-col flex-none sticky top-0 h-screen bg-card border-r border-border overflow-hidden transition-[width] duration-200 ease-in-out',
-          sidebarCollapsed ? 'w-14' : 'w-52'
-        )}>
+        <aside
+          className={cn(
+            'hidden lg:flex flex-col flex-none sticky top-0 h-screen bg-card border-r border-border overflow-hidden transition-[width] duration-200 ease-in-out',
+            sidebarCollapsed ? 'w-14' : 'w-52'
+          )}
+        >
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {sidebarCollapsed ? <CollapsedSidebar /> : <SidebarContent />}
           </div>
         </aside>
 
-        {/* Left Sidebar - Mobile */}
-        <aside className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out lg:hidden',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}>
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out lg:hidden',
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
           <SidebarContent />
           <button
             className="absolute top-4 right-3 text-muted-foreground hover:text-foreground"
@@ -655,7 +515,6 @@ export function Layout() {
           </button>
         </aside>
 
-        {/* Mobile header */}
         <header className="lg:hidden fixed top-0 left-0 right-0 z-30 flex items-center h-12 border-b border-border px-4 gap-3 bg-card">
           <button onClick={() => setSidebarOpen(true)} className="text-foreground">
             <Menu className="size-5" />
@@ -665,12 +524,10 @@ export function Layout() {
           </div>
         </header>
 
-        {/* Main content */}
         <div className="flex-1 min-w-0 pt-12 lg:pt-0">
           <Outlet />
         </div>
 
-        {/* Right Panel - Desktop only */}
         <div className="hidden lg:block w-[300px] flex-none border-l border-border">
           <RightPanel />
         </div>
