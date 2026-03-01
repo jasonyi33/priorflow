@@ -7,7 +7,9 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 
-from tools.minimax_client import MiniMaxClient
+from pypdf import PdfReader
+
+from tools.minimax_client import MiniMaxClient, MiniMaxClientError
 
 
 OUTPUT_DIR = Path("output") / "minimax"
@@ -16,8 +18,18 @@ OUTPUT_DIR = Path("output") / "minimax"
 def extract_pdf_to_pa_fields(pdf_path: Path) -> dict[str, Any]:
     """Extract normalized PA fields from a PDF chart."""
     client = MiniMaxClient()
-    file_id = client.upload_file(pdf_path)
-    raw_text = client.fetch_file_content(file_id)
+    file_id = "local_pdf"
+    raw_text = ""
+    try:
+        file_id = client.upload_file(pdf_path)
+        raw_text = client.fetch_file_content(file_id)
+    except MiniMaxClientError:
+        # Some MiniMax accounts reject PDF upload purposes. Fall back to local extraction.
+        raw_text = _extract_pdf_text_local(pdf_path)
+
+    if not raw_text.strip():
+        raise MiniMaxClientError("No extractable text found in uploaded PDF")
+
     extracted = client.chat_extract_structured(raw_text)
     return _normalize_extraction(extracted, file_id=file_id)
 
@@ -110,3 +122,20 @@ def _normalize_extraction(data: dict[str, Any], file_id: str) -> dict[str, Any]:
             missing.add(path)
     normalized["missing_fields"] = sorted(missing)
     return normalized
+
+
+def _extract_pdf_text_local(pdf_path: Path) -> str:
+    """Extract text directly from PDF file using local parser."""
+    try:
+        reader = PdfReader(str(pdf_path))
+        text_parts: list[str] = []
+        for page in reader.pages:
+            try:
+                page_text = page.extract_text() or ""
+                if page_text.strip():
+                    text_parts.append(page_text)
+            except Exception:
+                continue
+        return "\n\n".join(text_parts).strip()
+    except Exception as exc:  # noqa: BLE001
+        raise MiniMaxClientError(f"Local PDF extraction failed: {exc}") from exc
