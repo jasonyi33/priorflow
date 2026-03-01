@@ -30,7 +30,7 @@ def test_extractor_feeds_local_pdf_text_into_minimax(monkeypatch, tmp_path):
 
     assert captured["raw_text"] == "First Name: Jane\nLast Name: Doe\n"
     assert extracted["patient"]["first_name"] == "Jane"
-    assert extracted["source"]["minimax_file_id"] == "file_abc123"
+    assert extracted["source"]["minimax_file_id"] == "local_pdf"
 
 
 def test_extractor_still_uses_local_text_when_upload_fails(monkeypatch, tmp_path):

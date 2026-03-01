@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import Any
 import httpx
 
 from server.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class MiniMaxClientError(RuntimeError):
@@ -129,6 +132,10 @@ class MiniMaxClient:
                 content = self._extract_content_text(data)
                 return self._parse_json_content(content)
             except (httpx.HTTPError, ValueError, MiniMaxClientError) as exc:
+                resp_info = ""
+                if isinstance(exc, httpx.HTTPStatusError):
+                    resp_info = f" status={exc.response.status_code} body={exc.response.text[:500]}"
+                logger.error("MiniMax chat attempt %d/3 failed: %s%s", attempt + 1, exc, resp_info)
                 if attempt == 2:
                     raise MiniMaxClientError(f"MiniMax structured extraction failed: {exc}") from exc
                 time.sleep(0.5 * (attempt + 1))
