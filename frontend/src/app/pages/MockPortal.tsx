@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Info, CheckCircle2, XCircle, Globe, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '../../lib/api';
+import { API_BASE, api } from '../../lib/api';
 import { usePADashboardContext } from '../../lib/hooks';
 
 interface SubmissionResult {
@@ -98,7 +98,7 @@ export function MockPortal() {
           });
         };
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/patients/${selectedMrn}`);
+        const res = await fetch(`${API_BASE}/patients/${selectedMrn}`);
         if (!res.ok) {
           buildSummaryChart();
           return;

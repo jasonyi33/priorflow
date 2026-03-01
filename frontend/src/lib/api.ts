@@ -11,7 +11,13 @@ import {
   ApiHealth,
 } from './types';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const envApiBase = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+const isBrowser = typeof window !== 'undefined';
+const isLocalHost = isBrowser && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+// Local dev defaults to FastAPI on :8000. Deployment defaults to same-origin /api.
+export const API_BASE = (envApiBase && envApiBase.replace(/\/$/, '')) || (isLocalHost ? 'http://localhost:8000/api' : '/api');
+export const API_ORIGIN = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
 
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

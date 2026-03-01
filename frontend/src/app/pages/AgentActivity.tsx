@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle, Loader2, RefreshCw, Activity, ChevronRight, Down
 import { usePADashboardContext } from '../../lib/hooks';
 import { AgentRun } from '../../lib/types';
 import { getAgentTypeLabel } from '../../lib/dashboard';
+import { API_ORIGIN } from '../../lib/api';
 
 type TabKey = 'all' | 'running' | 'completed' | 'failed';
 
@@ -231,7 +232,7 @@ export function AgentActivity() {
                     <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
                       {selected.result.gifUrl && (
                         <a
-                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${selected.result.gifUrl}`}
+                          href={`${API_ORIGIN}${selected.result.gifUrl}`}
                           download
                           className="inline-flex items-center gap-2 px-3 py-1.5 bg-muted/50 border border-border rounded text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors"
                         >
