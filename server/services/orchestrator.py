@@ -134,6 +134,15 @@ async def dispatch_full_flow(mrn: str) -> dict:
 _running_tasks: dict[str, asyncio.Task] = {}
 _run_states: dict[str, dict] = {}
 _convex_run_doc_ids: dict[str, str] = {}
+_pa_results: dict[str, dict] = {}  # mrn -> PA submission output
+
+
+def _log_step(run_id: str, message: str):
+    """Append a timestamped log entry to a run's activity log."""
+    state = _run_states.get(run_id)
+    if state is not None:
+        ts = datetime.now(UTC).strftime("%H:%M:%S")
+        state.setdefault("logs", []).append(f"[{ts}] {message}")
 
 
 @observe(
@@ -162,7 +171,10 @@ async def _start_run(run_id: str, agent_type: AgentType, mrn: str, portal: Porta
         "completed_at": None,
         "success": None,
         "error_message": None,
+        "gif_path": None,
+        "logs": [],
     }
+    _log_step(run_id, f"Agent run created — {agent_type.value} for {mrn} on {portal.value}")
     await _persist_run(run)
 
 
@@ -187,15 +199,20 @@ async def _run_with_retry(run_id: str, agent_type: AgentType, mrn: str, portal: 
     attempt = 0
     while attempt < MAX_AGENT_RETRIES:
         try:
+            _log_step(run_id, f"Attempt {attempt + 1}/{MAX_AGENT_RETRIES} — starting {agent_type.value} agent")
             await asyncio.wait_for(fn(mrn, portal), timeout=AGENT_RUN_TIMEOUT)
+            _log_step(run_id, "Agent execution completed successfully")
             await _complete_run(run_id, success=True)
             return
         except Exception as exc:  # noqa: BLE001
             attempt += 1
+            _log_step(run_id, f"Attempt {attempt} failed: {str(exc)[:200]}")
             _run_states[run_id]["status"] = "retrying"
             if attempt >= MAX_AGENT_RETRIES:
+                _log_step(run_id, f"All {MAX_AGENT_RETRIES} attempts exhausted — marking as failed")
                 await _complete_run(run_id, success=False, error=str(exc))
                 return
+            _log_step(run_id, f"Retrying in {RETRY_BACKOFF_BASE * attempt}s…")
             await asyncio.sleep(RETRY_BACKOFF_BASE * attempt)
 
 
@@ -207,11 +224,22 @@ async def _run_with_retry(run_id: str, agent_type: AgentType, mrn: str, portal: 
     ignore_output=True,
 )
 async def _run_eligibility(mrn: str, portal: Portal):
+    run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "eligibility" and s["status"] in ("started", "retrying")), None)
+    if run_id:
+        _log_step(run_id, "Loading patient chart data")
     if ENABLE_AGENT_EXECUTION:
         from agents.eligibility_checker import check_eligibility_stedi
+        if run_id:
+            _log_step(run_id, "Connecting to Stedi eligibility API")
         await check_eligibility_stedi(mrn)
+        if run_id:
+            _log_step(run_id, "Eligibility response received — parsing results")
     else:
+        if run_id:
+            _log_step(run_id, "Using fixture data (ENABLE_AGENT_EXECUTION=false)")
         await _write_fixture_output(mrn, "eligibility")
+    if run_id:
+        _log_step(run_id, "Persisting eligibility output to storage")
     await _persist_output_file(mrn, "eligibility")
 
 
@@ -223,11 +251,29 @@ async def _run_eligibility(mrn: str, portal: Portal):
     ignore_output=True,
 )
 async def _run_pa_submission(mrn: str, portal: Portal):
+    run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "pa_form_filler" and s["status"] in ("started", "retrying")), None)
+    if run_id:
+        _log_step(run_id, "Loading patient chart and clinical data")
     if ENABLE_AGENT_EXECUTION:
         from agents.pa_form_filler import fill_covermymeds_pa
+        if run_id:
+            _log_step(run_id, "Launching Browser Use agent for CoverMyMeds")
+            _log_step(run_id, "Navigating to CoverMyMeds portal")
+            _log_step(run_id, "Authenticating with portal credentials")
         await fill_covermymeds_pa(mrn)
+        if run_id:
+            _log_step(run_id, "PA form filled and submitted via browser automation")
+            # Check for GIF recording
+            gif_file = OUTPUT_DIR / f"pa_submission_{mrn}.gif"
+            if gif_file.exists():
+                _run_states[run_id]["gif_path"] = str(gif_file)
+                _log_step(run_id, f"Agent recording saved: {gif_file.name}")
     else:
+        if run_id:
+            _log_step(run_id, "Using fixture data (ENABLE_AGENT_EXECUTION=false)")
         await _write_fixture_output(mrn, "pa_submission")
+    if run_id:
+        _log_step(run_id, "Persisting PA submission output to storage")
     await _persist_output_file(mrn, "pa_submission")
 
 
@@ -239,12 +285,23 @@ async def _run_pa_submission(mrn: str, portal: Portal):
     ignore_output=True,
 )
 async def _run_status_check(mrn: str, portal: Portal):
+    run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "status_monitor" and s["status"] in ("started", "retrying")), None)
+    if run_id:
+        _log_step(run_id, "Looking up patient information")
     if ENABLE_AGENT_EXECUTION:
         from agents.status_monitor import monitor_covermymeds
         patient_name = _lookup_patient_name(mrn)
+        if run_id:
+            _log_step(run_id, f"Connecting to CoverMyMeds to check status for {patient_name}")
         await monitor_covermymeds(mrn, patient_name)
+        if run_id:
+            _log_step(run_id, "Status check response received from portal")
     else:
+        if run_id:
+            _log_step(run_id, "Using fixture data (ENABLE_AGENT_EXECUTION=false)")
         await _write_fixture_output(mrn, "status")
+    if run_id:
+        _log_step(run_id, "Persisting status update to storage")
     await _persist_output_file(mrn, "status")
 
 
@@ -299,6 +356,10 @@ async def _complete_run(run_id: str, success: bool, error: Optional[str] = None)
         state["completed_at"] = completed_at.isoformat()
         state["success"] = success
         state["error_message"] = error
+        if success:
+            _log_step(run_id, "Run completed successfully")
+        else:
+            _log_step(run_id, f"Run failed: {error or 'unknown error'}")
 
     if convex_client.enabled:
         try:
@@ -349,6 +410,8 @@ async def _persist_output_file(mrn: str, prefix: str):
         try:
             with open(path) as f:
                 data = json.load(f)
+            # Store in memory so the PA list endpoint can find it immediately
+            _pa_results[mrn] = data
             now = datetime.now(UTC)
             pa = PARequest(
                 mrn=data.get("mrn", mrn),

@@ -36,7 +36,46 @@ export function MockPortal() {
     if (!selectedMrn) { setChart(null); return; }
     fetch(`${API_BASE}/patients/${selectedMrn}`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => setChart(data))
+      .then(data => {
+        if (!data) { setChart(null); return; }
+        // Normalize: API may return nested chart format or flat Convex format
+        if (data.patient) {
+          setChart(data);
+        } else {
+          setChart({
+            patient: {
+              name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+              first_name: data.firstName || '',
+              last_name: data.lastName || '',
+              dob: data.dob || '',
+              mrn: data.mrn || selectedMrn,
+            },
+            insurance: {
+              payer: data.insurance?.payer || '',
+              member_id: data.insurance?.memberId || data.insurance?.member_id || '',
+              bin: data.insurance?.bin || '',
+              pcn: data.insurance?.pcn || '',
+              rx_group: data.insurance?.rxGroup || data.insurance?.rx_group || '',
+              plan_name: data.insurance?.planName || data.insurance?.plan_name || '',
+            },
+            diagnosis: {
+              icd10: data.diagnosis?.icd10 || '',
+              description: data.diagnosis?.description || '',
+            },
+            medication: data.medication ? {
+              name: data.medication.name || '',
+              dose: data.medication.dose || '',
+              frequency: data.medication.frequency || '',
+            } : undefined,
+            provider: {
+              name: data.provider?.name || '',
+              npi: data.provider?.npi || '',
+              phone: data.provider?.phone || '',
+              fax: data.provider?.fax || '',
+            },
+          });
+        }
+      })
       .catch(() => setChart(null));
   }, [selectedMrn]);
 

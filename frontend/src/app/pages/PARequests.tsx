@@ -40,7 +40,11 @@ export function PARequests() {
     api.getPARequests().then((data) => {
       setRequests(data);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
+    const interval = setInterval(() => {
+      api.getPARequests().then(setRequests).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const filtered: Record<TabKey, PARequest[]> = {

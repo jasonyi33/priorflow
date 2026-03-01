@@ -96,22 +96,39 @@ const AGENT_TYPE_MAP: Record<string, AgentRun['type']> = {
 
 function toAgentRun(data: any): AgentRun {
   let status: AgentRun['status'];
-  if (data.completed_at && data.success === true) status = 'completed';
-  else if (data.completed_at && data.success === false) status = 'failed';
+  if (data.status === 'completed' && data.success !== false) status = 'completed';
+  else if (data.status === 'failed' || (data.completed_at && data.success === false)) status = 'failed';
+  else if (data.completed_at && data.success === true) status = 'completed';
   else status = 'running';
 
+  // Use backend logs array if available, otherwise generate a summary line
+  let logs: string[];
+  if (Array.isArray(data.logs) && data.logs.length > 0) {
+    logs = data.logs;
+  } else if (data.error_message) {
+    logs = [data.error_message];
+  } else {
+    logs = [`${data.steps_taken ?? 0}/${data.max_steps ?? 25} steps completed`];
+  }
+
+  // Build result object with gif download URL if available
+  let result: any = undefined;
+  const gifPath = data.gif_path || data.gifPath;
+  if (gifPath) {
+    const gifFilename = gifPath.split('/').pop();
+    result = { gifPath, gifUrl: `/api/agents/gif/${gifFilename}` };
+  }
+
   return {
-    id: data.id || `run-${data.started_at}`,
-    type: AGENT_TYPE_MAP[data.agent_type] || 'pa_submission',
+    id: data.id || data.run_id || `run-${data.started_at}`,
+    type: AGENT_TYPE_MAP[data.agent_type] || AGENT_TYPE_MAP[data.agentType] || 'pa_submission',
     status,
     patientId: data.mrn,
     patientName: data.mrn,
-    startedAt: data.started_at,
-    completedAt: data.completed_at || undefined,
-    logs: data.error_message
-      ? [data.error_message]
-      : [`${data.steps_taken ?? 0}/${data.max_steps ?? 25} steps completed`],
-    result: data.gif_path ? { gifPath: data.gif_path } : undefined,
+    startedAt: data.started_at || data.startedAt,
+    completedAt: data.completed_at || data.completedAt || undefined,
+    logs,
+    result,
   };
 }
 
