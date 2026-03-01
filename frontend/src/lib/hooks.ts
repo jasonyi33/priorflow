@@ -9,14 +9,8 @@ import {
 } from 'react';
 import { API_BASE, api } from './api';
 import { AgentRun, ApiHealth, EligibilityResult, PARequest, Patient } from './types';
-import { buildDemoSnapshot } from './demoData';
 
 const POLL_INTERVAL_MS = 5000;
-const DEMO_DATA_ENABLED = import.meta.env.VITE_ENABLE_DEMO_DATA !== 'false';
-const MIN_DEMO_PATIENTS = 7;
-const MIN_DEMO_ELIGIBILITY = 7;
-const MIN_DEMO_PA_REQUESTS = 7;
-const MIN_DEMO_AGENT_RUNS = 7;
 
 const PENDING_STATUSES: PARequest['status'][] = [
   'pending',
@@ -115,26 +109,6 @@ function computeMetrics(
   };
 }
 
-function mergeSparseById<T extends { id: string }>(live: T[], demo: T[], minCount: number): T[] {
-  const liveIds = new Set(live.map((item) => item.id));
-  if (live.length >= minCount) {
-    return live;
-  }
-
-  return [
-    ...live,
-    ...demo.filter((item) => !liveIds.has(item.id)).slice(0, Math.max(minCount - live.length, 0)),
-  ];
-}
-
-function sortByDate<T>(items: T[], getDate: (item: T) => string | undefined): T[] {
-  return [...items].sort((a, b) => {
-    const left = new Date(getDate(a) || 0).getTime();
-    const right = new Date(getDate(b) || 0).getTime();
-    return right - left;
-  });
-}
-
 export function usePADashboard(): PADashboardData {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [eligibilityResults, setEligibilityResults] = useState<EligibilityResult[]>([]);
@@ -165,56 +139,17 @@ export function usePADashboard(): PADashboardData {
     const liveAgentRuns = runsResult.status === 'fulfilled' ? runsResult.value : [];
     const liveHealth = healthResult.status === 'fulfilled' ? healthResult.value : undefined;
 
-    const demoSnapshot = buildDemoSnapshot(livePatients);
-    const shouldUseDemo =
-      DEMO_DATA_ENABLED &&
-      (
-        livePatients.length < MIN_DEMO_PATIENTS ||
-        liveEligibility.length < MIN_DEMO_ELIGIBILITY ||
-        livePARequests.length < MIN_DEMO_PA_REQUESTS ||
-        liveAgentRuns.length < MIN_DEMO_AGENT_RUNS
-      );
-
-    const nextPatients = shouldUseDemo
-      ? mergeSparseById(livePatients, demoSnapshot.patients, MIN_DEMO_PATIENTS)
-      : livePatients;
-    const nextEligibility = shouldUseDemo
-      ? sortByDate(
-          mergeSparseById(liveEligibility, demoSnapshot.eligibilityResults, MIN_DEMO_ELIGIBILITY),
-          (item) => item.checkDate
-        )
-      : liveEligibility;
-    const nextPARequests = shouldUseDemo
-      ? sortByDate(
-          mergeSparseById(livePARequests, demoSnapshot.paRequests, MIN_DEMO_PA_REQUESTS),
-          (item) => item.lastUpdated
-        )
-      : livePARequests;
-    const nextAgentRuns = shouldUseDemo
-      ? sortByDate(
-          mergeSparseById(liveAgentRuns, demoSnapshot.agentRuns, MIN_DEMO_AGENT_RUNS),
-          (item) => item.completedAt || item.startedAt
-        )
-      : liveAgentRuns;
-
-    setPatients(nextPatients);
-    setEligibilityResults(nextEligibility);
-    setPARequests(nextPARequests);
-    setAgentRuns(nextAgentRuns);
-    setIsDemoMode(shouldUseDemo);
+    setPatients(livePatients);
+    setEligibilityResults(liveEligibility);
+    setPARequests(livePARequests);
+    setAgentRuns(liveAgentRuns);
+    setIsDemoMode(false);
     setHealth(
       liveHealth ||
-        (shouldUseDemo
-          ? {
-              status: 'ok',
-              service: 'priorflow-demo',
-              checkedAt: new Date().toISOString(),
-              apiBase: API_BASE,
-            }
-          : {
-              ...DEFAULT_HEALTH,
-              checkedAt: new Date().toISOString(),
-            })
+        {
+          ...DEFAULT_HEALTH,
+          checkedAt: new Date().toISOString(),
+        }
     );
     setLastUpdatedAt(new Date().toISOString());
     setLoading(false);
