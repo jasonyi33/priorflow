@@ -50,6 +50,7 @@ class MiniMaxClient:
                     raise MiniMaxClientError(f"MiniMax upload retryable error: {response.status_code}")
                 response.raise_for_status()
                 payload = response.json()
+                self._raise_for_base_resp_error(payload)
                 return self._extract_file_id(payload)
             except (httpx.HTTPError, ValueError, MiniMaxClientError) as exc:
                 if attempt == 2:
@@ -144,16 +145,32 @@ class MiniMaxClient:
         return params
 
     @staticmethod
+    def _raise_for_base_resp_error(payload: dict[str, Any]) -> None:
+        base_resp = payload.get("base_resp")
+        if not isinstance(base_resp, dict):
+            return
+
+        status_code = base_resp.get("status_code")
+        status_msg = str(base_resp.get("status_msg", "")).strip()
+        if status_code in (None, 0, "0"):
+            return
+
+        details = f"{status_code}"
+        if status_msg:
+            details = f"{details} ({status_msg})"
+        raise MiniMaxClientError(f"MiniMax API error: {details}")
+
+    @staticmethod
     def _extract_file_id(payload: dict[str, Any]) -> str:
         file_id = payload.get("file_id")
-        if isinstance(file_id, str) and file_id:
-            return file_id
+        if isinstance(file_id, (str, int)) and str(file_id).strip():
+            return str(file_id).strip()
 
         file_obj = payload.get("file")
         if isinstance(file_obj, dict):
             nested = file_obj.get("id") or file_obj.get("file_id")
-            if isinstance(nested, str) and nested:
-                return nested
+            if isinstance(nested, (str, int)) and str(nested).strip():
+                return str(nested).strip()
 
         raise MiniMaxClientError("MiniMax upload response missing file_id")
 
