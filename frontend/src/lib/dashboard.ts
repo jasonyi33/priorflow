@@ -63,7 +63,7 @@ export function buildLiveNotifications(params: {
   agentRuns: AgentRun[];
   eligibilityResults: EligibilityResult[];
 }): LiveNotification[] {
-  const paNotifications = params.paRequests.slice(0, 8).map((request) => ({
+  const paNotifications = params.paRequests.slice(0, 8).map((request): LiveNotification => ({
     id: `pa-${request.id}-${request.status}`,
     title:
       request.status === 'approved'
@@ -91,7 +91,7 @@ export function buildLiveNotifications(params: {
         : 'low',
   }));
 
-  const runNotifications = params.agentRuns.slice(0, 8).map((run) => ({
+  const runNotifications = params.agentRuns.slice(0, 8).map((run): LiveNotification => ({
     id: `run-${run.id}-${run.status}`,
     title: `${getAgentTypeLabel(run.type).toUpperCase()} ${run.status === 'running' ? 'RUNNING' : run.status === 'completed' ? 'COMPLETED' : 'FAILED'}`,
     message: `${run.patientName} · ${run.logs[run.logs.length - 1] || 'No log output yet'}`,
@@ -100,7 +100,7 @@ export function buildLiveNotifications(params: {
     priority: run.status === 'failed' ? 'high' : run.status === 'running' ? 'low' : 'medium',
   }));
 
-  const eligibilityNotifications = params.eligibilityResults.slice(0, 6).map((result) => ({
+  const eligibilityNotifications = params.eligibilityResults.slice(0, 6).map((result): LiveNotification => ({
     id: `eligibility-${result.id}`,
     title: result.isEligible ? 'ELIGIBILITY VERIFIED' : 'ELIGIBILITY ISSUE',
     message: `${result.patientName} · ${result.insuranceProvider}`,
