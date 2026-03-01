@@ -38,29 +38,40 @@ except Exception:  # noqa: BLE001
 
 load_dotenv()
 
+STEDI_LOGIN_URL = "https://portal.stedi.com/auth"
+STEDI_PORTAL_URL = "https://portal.stedi.com/"
+
+
+FAILURE_MARKERS = (
+    "unable to complete",
+    "unable to access",
+    "could not access",
+    "could not complete",
+    "navigation failed",
+    "invalid url",
+    "security checkpoint",
+    "bot protection",
+)
+
+
 def _build_task_prompt(mrn: str, chart: dict) -> str:
     patient = chart["patient"]
     insurance = chart["insurance"]
-    provider = chart["provider"]
     return f"""
 You are a healthcare eligibility verification assistant.
 
-1. Navigate to {STEDI_URL} and log in:
+1. Open {STEDI_PORTAL_URL}.
+2. If already authenticated via existing profile session, continue without logging in.
+3. Only if login is required, use:
    - Email: x]stedi_email[x
    - Password: x]stedi_password[x
-2. Ensure Test mode is ON.
-3. Create a new eligibility check.
-4. Select payer matching "{insurance['payer']}".
-5. Fill subscriber/patient details:
-   - First name: {patient['first_name']}
-   - Last name: {patient['last_name']}
-   - DOB: {patient['dob']}
-   - Member ID: {insurance['member_id']}
-6. Fill provider details:
-   - Name: {provider['name']}
-   - NPI: {provider['npi']}
-7. Submit the eligibility check.
-8. Extract and return a concise plain-text summary including:
+4. Ensure Test mode is ON.
+5. Create a new eligibility check.
+6. Select payer strictly based on the insurance plan/payer from chart: "{insurance['payer']}".
+7. IMPORTANT: Do NOT override/fix remaining fields with custom chart values.
+   Use Stedi's built-in Test mode sample/test-case values for subscriber/provider details.
+8. Submit the eligibility check.
+9. Extract and return a concise plain-text summary including:
    - coverage status (active/inactive)
    - copay
    - deductible / out-of-pocket
@@ -107,7 +118,7 @@ async def check_eligibility_stedi(mrn: str):
     try:
         session = await client.sessions.create_session(
             profile_id=profile_id,
-            start_url=STEDI_URL,
+            start_url=STEDI_PORTAL_URL,
             keep_alive=True,
         )
         session_id = str(session.id)
@@ -115,28 +126,35 @@ async def check_eligibility_stedi(mrn: str):
         if hasattr(session, "live_url"):
             print(f"👁️  Live view: {session.live_url}")
 
+        # Always provide explicit credentials for login fallback.
+        # Keep profile session enabled to avoid MFA when cookies are valid.
+        secrets: dict[str, str] = {
+            "stedi_email": sensitive["stedi_email"],
+            "stedi_password": sensitive["stedi_password"],
+            "https://portal.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
+            "https://*.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
+        }
+
         task = await client.tasks.create_task(
             session_id=session_id,
             llm=llm,
             task=task_prompt,
-            start_url=STEDI_URL,
+            start_url=STEDI_PORTAL_URL,
             max_steps=DEFAULT_MAX_STEPS_ELIGIBILITY,
             vision=True,
             flash_mode=True,
             thinking=True,
-            allowed_domains=["stedi.com"],
-            secrets={
-                "https://*.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
-                "https://www.stedi.com": f"{sensitive['stedi_email']}|||{sensitive['stedi_password']}",
-            },
+            allowed_domains=["stedi.com", "portal.stedi.com"],
+            secrets=secrets,
             metadata={
                 "agent": "eligibility",
                 "portal": "stedi",
                 "mrn": mrn,
+                "profile_id": profile_id or "",
             },
             system_prompt_extension=(
-                "Always complete login first. Prefer on-screen values over assumptions. "
-                "Return final summary as plain text, not JSON."
+                "Prefer authenticated profile session; do not trigger MFA unless strictly required. "
+                "Prefer on-screen values over assumptions. Return final summary as plain text, not JSON."
             ),
         )
 
@@ -147,13 +165,17 @@ async def check_eligibility_stedi(mrn: str):
             print(f"   📍 Step {step_num}: {goal} ({url})")
 
         result = await client.tasks.get_task(task.id)
-        if not getattr(result, "is_success", False):
-            status = getattr(result, "status", "unknown")
-            raise RuntimeError(f"Eligibility task failed with status: {status}")
-
         raw_summary = str(getattr(result, "output", "") or "").strip()
+        status = str(getattr(result, "status", "") or "").lower()
+        is_success = bool(getattr(result, "is_success", False))
+        if not (is_success or (status in {"finished", "completed"} and raw_summary)):
+            raise RuntimeError(f"Eligibility task failed with status: {status or 'unknown'}")
+
         if not raw_summary:
             raise RuntimeError("Eligibility task completed without output")
+        lowered = raw_summary.lower()
+        if any(marker in lowered for marker in FAILURE_MARKERS):
+            raise RuntimeError(f"Eligibility agent reported portal failure: {raw_summary[:180]}")
 
         parsed = parse_stedi_response(mrn, raw_summary)
         await save_eligibility_result(parsed)
