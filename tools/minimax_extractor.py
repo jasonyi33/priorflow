@@ -175,54 +175,54 @@ def _fill_missing_from_text(raw_text: str, normalized: dict[str, Any]) -> dict[s
     support = normalized.get("clinical_support", {})
 
     if not patient.get("first_name"):
-        patient["first_name"] = _search(r"First\\s+Name\\s*:\\s*([^\\n]+)")
+        patient["first_name"] = _search(r"First\s+Name\s*:\s*([^\n]+)")
     if not patient.get("last_name"):
-        patient["last_name"] = _search(r"Last\\s+Name\\s*:\\s*([^\\n]+)")
+        patient["last_name"] = _search(r"Last\s+Name\s*:\s*([^\n]+)")
     if not patient.get("dob"):
-        patient["dob"] = _search(r"(?:Date\\s+of\\s+Birth|DOB)\\s*:\\s*([0-9]{4}-[0-9]{2}-[0-9]{2})")
+        patient["dob"] = _search(r"(?:Date\s+of\s+Birth|DOB)\s*:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})")
     if not patient.get("gender"):
-        patient["gender"] = _search(r"Gender\\s*:\\s*([^\\n]+)")
+        patient["gender"] = _search(r"Gender\s*:\s*([^\n]+)")
 
     if not insurance.get("payer"):
-        insurance["payer"] = _search(r"Insurance\\s+Payer\\s*:\\s*([^\\n]+)")
+        insurance["payer"] = _search(r"Insurance\s+Payer\s*:\s*([^\n]+)")
     if not insurance.get("member_id"):
-        insurance["member_id"] = _search(r"(?:Insurance\\s+Member\\s+ID|Member\\s+ID)\\s*:\\s*([^\\n]+)")
+        insurance["member_id"] = _search(r"(?:Insurance\s+Member\s+ID|Member\s+ID)\s*:\s*([^\n]+)")
     if not insurance.get("bin"):
-        insurance["bin"] = _search(r"\\bBIN\\s*:\\s*([^\\s\\n]+)")
+        insurance["bin"] = _search(r"\bBIN\s*:\s*([^\s\n]+)")
     if not insurance.get("pcn"):
-        insurance["pcn"] = _search(r"\\bPCN\\s*:\\s*([^\\s\\n]+)")
+        insurance["pcn"] = _search(r"\bPCN\s*:\s*([^\s\n]+)")
     if not insurance.get("rx_group"):
-        insurance["rx_group"] = _search(r"(?:Rx\\s*Group|RxGroup|RXGROUP)\\s*:\\s*([^\\s\\n]+)")
+        insurance["rx_group"] = _search(r"(?:Rx\s*Group|RxGroup|RXGROUP)\s*:\s*([^\s\n]+)")
 
     if not diagnosis.get("icd10"):
-        diagnosis["icd10"] = _search(r"(?:Diagnosis\\s+)?ICD[- ]?10\\s*:\\s*([^\\s\\n]+)")
+        diagnosis["icd10"] = _search(r"(?:Diagnosis\s+)?ICD[- ]?10\s*:\s*([^\s\n]+)")
     if not diagnosis.get("description"):
-        diagnosis["description"] = _search(r"Diagnosis\\s+Description\\s*:\\s*([^\\n]+)")
+        diagnosis["description"] = _search(r"Diagnosis\s+Description\s*:\s*([^\n]+)")
 
     if not medication.get("name"):
-        medication["name"] = _search(r"Medication\\s+Name\\s*:\\s*([^\\n]+)")
+        medication["name"] = _search(r"Medication\s+Name\s*:\s*([^\n]+)")
     if not medication.get("dose"):
-        medication["dose"] = _search(r"\\bDose\\s*:\\s*([^\\n]+)")
+        medication["dose"] = _search(r"\bDose\s*:\s*([^\n]+)")
     if not medication.get("frequency"):
-        medication["frequency"] = _search(r"Frequency\\s*:\\s*([^\\n]+)")
+        medication["frequency"] = _search(r"Frequency\s*:\s*([^\n]+)")
     if not medication.get("quantity"):
-        medication["quantity"] = _search(r"Quantity\\s*:\\s*([^\\n]+)")
+        medication["quantity"] = _search(r"Quantity\s*:\s*([^\n]+)")
     if not medication.get("days_supply"):
-        medication["days_supply"] = _search(r"Days\\s+Supply\\s*:\\s*([^\\n]+)")
+        medication["days_supply"] = _search(r"Days\s+Supply\s*:\s*([^\n]+)")
     if not medication.get("dosage_form"):
-        medication["dosage_form"] = _search(r"Dosage\\s+Form\\s*:\\s*([^\\n]+)")
+        medication["dosage_form"] = _search(r"Dosage\s+Form\s*:\s*([^\n]+)")
 
     if not provider.get("name"):
-        provider["name"] = _search(r"Provider\\s+Name\\s*:\\s*([^\\n]+)")
+        provider["name"] = _search(r"Provider\s+Name\s*:\s*([^\n]+)")
     if not provider.get("npi"):
-        provider["npi"] = _search(r"Provider\\s+NPI\\s*:\\s*([^\\s\\n]+)")
+        provider["npi"] = _search(r"Provider\s+NPI\s*:\s*([^\s\n]+)")
     if not provider.get("phone"):
-        provider["phone"] = _search(r"Provider\\s+Phone\\s*:\\s*([^\\n]+)")
+        provider["phone"] = _search(r"Provider\s+Phone\s*:\s*([^\n]+)")
     if not provider.get("fax"):
-        provider["fax"] = _search(r"Provider\\s+Fax\\s*:\\s*([^\\n]+)")
+        provider["fax"] = _search(r"Provider\s+Fax\s*:\s*([^\n]+)")
 
     if not support.get("prior_therapies"):
-        therapies = _search(r"Prior\\s+Therapies\\s*:\\s*([^\\n]+)")
+        therapies = _search(r"Prior\s+Therapies\s*:\s*([^\n]+)")
         if therapies:
             support["prior_therapies"] = [part.strip() for part in therapies.split(",") if part.strip()]
 
