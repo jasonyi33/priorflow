@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { usePADashboardContext } from '../../lib/hooks';
 import { Search, FileText, Upload, Users, Building2, FileCheck, CalendarDays } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
+import { TabFocusRail } from '../components/TabFocusRail';
+import { TabFocusSignal, getFocusBucket, useStickyFocusKey } from '../../lib/focusSignals';
 
 function age(dob: string): number {
   const diff = Date.now() - new Date(dob).getTime();
@@ -25,11 +27,109 @@ export function Patients() {
     [patients, searchTerm]
   );
 
+  const activePAsByPatientId = useMemo(() => {
+    const activeStatuses = new Set(['pending', 'checking_eligibility', 'generating_request', 'submitting', 'more_info_needed']);
+    const counts = new Map<string, number>();
+    for (const request of dashboard.paRequests) {
+      if (!activeStatuses.has(request.status)) continue;
+      counts.set(request.patientId, (counts.get(request.patientId) || 0) + 1);
+    }
+    return counts;
+  }, [dashboard.paRequests]);
+
+  const sortedByCreated = useMemo(
+    () =>
+      [...patients].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [patients]
+  );
+
   const insurers = new Set(patients.map((patient) => patient.insuranceProvider)).size;
   const withCharts = patients.filter((patient) => patient.chartUrl).length;
   const recentlyAdded = patients.filter(
     (patient) => differenceInDays(new Date(), new Date(patient.createdAt)) <= 7
   ).length;
+
+  const focusSignalByPatientId = useMemo(() => {
+    const map = new Map<string, TabFocusSignal>();
+    const now = Date.now();
+
+    for (const patient of sortedByCreated) {
+      const createdMs = new Date(patient.createdAt).getTime();
+      const activeCount = activePAsByPatientId.get(patient.id) || 0;
+      const missingChartRecently = !patient.chartUrl && now - createdMs <= 24 * 60 * 60 * 1000;
+
+      if (missingChartRecently) {
+        map.set(patient.id, {
+          key: patient.id,
+          title: 'New Patient Added - Chart Missing',
+          message: `${patient.name} was registered recently and still needs chart attachment.`,
+          timestamp: patient.createdAt,
+          severity: 'high',
+          actionLabel: 'Reveal Focus Patient',
+        });
+        continue;
+      }
+
+      if (activeCount > 0) {
+        map.set(patient.id, {
+          key: patient.id,
+          title: 'New Patient With Active Workflow',
+          message: `${patient.name} currently has ${activeCount} in-flight prior authorization item${activeCount > 1 ? 's' : ''}.`,
+          timestamp: patient.createdAt,
+          severity: 'medium',
+          actionLabel: 'Reveal Focus Patient',
+        });
+        continue;
+      }
+
+      map.set(patient.id, {
+        key: patient.id,
+        title: 'Latest Registration',
+        message: `${patient.name} is the newest patient added to the registry.`,
+        timestamp: patient.createdAt,
+        severity: 'low',
+        actionLabel: 'Reveal Focus Patient',
+      });
+    }
+
+    return map;
+  }, [activePAsByPatientId, sortedByCreated]);
+
+  const focusCandidate = useMemo(() => {
+    const now = Date.now();
+    const high = sortedByCreated.find((patient) => {
+      const createdMs = new Date(patient.createdAt).getTime();
+      return !patient.chartUrl && now - createdMs <= 24 * 60 * 60 * 1000;
+    });
+    if (high) return focusSignalByPatientId.get(high.id) || null;
+
+    const medium = sortedByCreated.find((patient) => (activePAsByPatientId.get(patient.id) || 0) > 0);
+    if (medium) return focusSignalByPatientId.get(medium.id) || null;
+
+    const low = sortedByCreated[0];
+    if (!low) return null;
+    return focusSignalByPatientId.get(low.id) || null;
+  }, [activePAsByPatientId, focusSignalByPatientId, sortedByCreated]);
+
+  const stickyFocusKey = useStickyFocusKey(
+    focusCandidate ? { key: focusCandidate.key, severity: focusCandidate.severity } : null
+  );
+
+  const activeFocusSignal = (stickyFocusKey && focusSignalByPatientId.get(stickyFocusKey)) || focusCandidate;
+
+  const scrollToRow = useCallback((key: string) => {
+    const escaped = key.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const row = document.querySelector(`[data-focus-key="${escaped}"]`) as HTMLElement | null;
+    row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, []);
+
+  const handleRevealFocus = useCallback(() => {
+    if (!activeFocusSignal) return;
+    setSearchTerm('');
+    window.setTimeout(() => scrollToRow(activeFocusSignal.key), 50);
+  }, [activeFocusSignal, scrollToRow]);
 
   const stats = [
     { label: 'Total Patients', value: String(patients.length), sub: 'on record', icon: Users },
@@ -42,6 +142,12 @@ export function Patients() {
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
+        <TabFocusRail
+          signal={activeFocusSignal}
+          onAction={handleRevealFocus}
+          disabled={!activeFocusSignal}
+        />
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded border border-border bg-card px-5 py-4">
@@ -108,17 +214,35 @@ export function Patients() {
           ) : (
             <div className="divide-y divide-border">
               {filtered.map((patient) => {
-                const activePAs = dashboard.paRequests.filter(
-                  (request) => request.patientId === patient.id && !['approved', 'denied'].includes(request.status)
-                ).length;
+                const activePAs = activePAsByPatientId.get(patient.id) || 0;
+                const isFocus = activeFocusSignal?.key === patient.id;
+                const focusBucket = isFocus ? getFocusBucket(activeFocusSignal.timestamp) : 'stale';
 
                 return (
                   <div
                     key={patient.id}
-                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors"
+                    data-focus-key={patient.id}
+                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors ${
+                      isFocus
+                        ? focusBucket === 'hot'
+                          ? 'border-l-2 border-primary bg-primary/10 hover:bg-primary/12'
+                          : 'border-l-2 border-primary/40 bg-primary/5 hover:bg-primary/8'
+                        : 'hover:bg-accent/35'
+                    }`}
                   >
                     <div className="col-span-3 min-w-0">
-                      <div className="text-sm font-semibold truncate">{patient.name}</div>
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        <span className="truncate">{patient.name}</span>
+                        {isFocus && (
+                          <span className={`px-1.5 py-0.5 text-[9px] rounded border font-semibold uppercase tracking-wider ${
+                            focusBucket === 'hot'
+                              ? 'bg-primary/20 text-primary border-primary/35'
+                              : 'bg-primary/10 text-primary border-primary/25'
+                          }`}>
+                            focus
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground/60 truncate">
                         DOB {new Date(patient.dateOfBirth).toLocaleDateString()} · Added{' '}
                         {formatDistanceToNow(new Date(patient.createdAt), { addSuffix: true })}
