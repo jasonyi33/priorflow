@@ -1,9 +1,10 @@
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { usePADashboardContext } from '../../lib/hooks';
-import { PAStatus, PARequest, Patient } from '../../lib/types';
+import { AgentRun, IntakeSessionTrace, PARequest, PAStatus, Patient, WorkflowStageState } from '../../lib/types';
 import { AlertTriangle, Check, X, Info, Clock, Upload, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { toast } from 'sonner';
+import { IntakeFlowTracker } from '../components/IntakeFlowTracker';
 
 // ─── Status config ───────────────────────────────────────────────────────────
 const PA_STATUS_CONFIG: Record<PAStatus, { label: string; cls: string }> = {
@@ -15,6 +16,49 @@ const PA_STATUS_CONFIG: Record<PAStatus, { label: string; cls: string }> = {
   submitting:           { label: 'Submitted',   cls: 'bg-primary/10 text-primary border border-primary/30' },
   more_info_needed:     { label: 'Info Needed', cls: 'bg-warning/10 text-warning border border-warning/30' },
 };
+
+const TRACKER_POLL_INTERVAL_MS = 5000;
+const TRACKER_STAGE_WAIT_TIMEOUT_MS = 30000;
+const TRACKER_MAX_RUNTIME_MS = 10 * 60 * 1000;
+
+const DEFAULT_TRACKER_STAGES: IntakeSessionTrace['stages'] = {
+  upload: 'waiting',
+  intake: 'waiting',
+  eligibility: 'waiting',
+  pa_submission: 'waiting',
+  status_monitor: 'waiting',
+  final_outcome: 'waiting',
+};
+
+function mapRunState(status: AgentRun['status']): WorkflowStageState {
+  if (status === 'running') return 'running';
+  if (status === 'completed') return 'succeeded';
+  return 'failed';
+}
+
+function getStageDetailFromRun(run: AgentRun): string {
+  const stateLabel = run.status.toUpperCase();
+  const tail = run.logs[run.logs.length - 1];
+  return tail ? `${stateLabel} · ${tail}` : `${stateLabel} · started ${relativeTime(run.startedAt)}`;
+}
+
+function parseApiError(err: unknown): { message: string; httpStatus?: number } {
+  if (!(err instanceof Error)) {
+    return { message: 'Upload failed' };
+  }
+
+  const match = err.message.match(/^API\s+(\d+):\s*(.*)$/i);
+  if (!match) {
+    return { message: err.message };
+  }
+
+  const httpStatus = Number(match[1]);
+  const detail = match[2] || 'Request failed';
+  return {
+    message: detail,
+    httpStatus: Number.isFinite(httpStatus) ? httpStatus : undefined,
+  };
+}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -259,6 +303,216 @@ export function Home() {
   const data = usePADashboardContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [trackerRefreshing, setTrackerRefreshing] = useState(false);
+  const [intakeSessions, setIntakeSessions] = useState<IntakeSessionTrace[]>([]);
+  const sessionPollersRef = useRef<Record<string, number>>({});
+
+  const stopSessionPolling = useCallback((sessionId: string) => {
+    const timer = sessionPollersRef.current[sessionId];
+    if (timer) {
+      window.clearInterval(timer);
+      delete sessionPollersRef.current[sessionId];
+    }
+  }, []);
+
+  const updateSession = useCallback((sessionId: string, updater: (session: IntakeSessionTrace) => IntakeSessionTrace) => {
+    setIntakeSessions((prev) => prev.map((session) => (session.sessionId === sessionId ? updater(session) : session)));
+  }, []);
+
+  const applyRunsToSession = useCallback((session: IntakeSessionTrace, runs: AgentRun[]) => {
+    const nowIso = new Date().toISOString();
+    const next: IntakeSessionTrace = {
+      ...session,
+      updatedAt: nowIso,
+      lastPolledAt: nowIso,
+      stageDetails: { ...session.stageDetails },
+      stages: { ...session.stages },
+      runIds: { ...session.runIds },
+    };
+
+    const intakeAcceptedMs = session.intakeAcceptedAt ? new Date(session.intakeAcceptedAt).getTime() : 0;
+    const relatedRuns = runs
+      .filter((run) => {
+        if (!intakeAcceptedMs) return true;
+        return new Date(run.startedAt).getTime() >= intakeAcceptedMs - 5000;
+      })
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+
+    const latestByType: Partial<Record<AgentRun['type'], AgentRun>> = {};
+    for (const run of relatedRuns) {
+      if (!latestByType[run.type]) {
+        latestByType[run.type] = run;
+      }
+    }
+
+    const eligibilityRun = latestByType.eligibility_check;
+    const paRun = latestByType.pa_submission;
+    const statusRun = latestByType.status_check;
+
+    next.stageDetails.upload = next.stageDetails.upload || 'PDF uploaded to intake endpoint';
+    next.stageDetails.intake = next.stageDetails.intake || (next.mrn ? `Accepted for ${next.mrn}` : 'Intake accepted');
+
+    if (eligibilityRun) {
+      next.runIds.eligibility = eligibilityRun.id;
+      next.stages.eligibility = mapRunState(eligibilityRun.status);
+      next.stageDetails.eligibility = getStageDetailFromRun(eligibilityRun);
+    } else {
+      next.stages.eligibility = 'running';
+      next.stageDetails.eligibility = 'Waiting for eligibility run dispatch';
+    }
+
+    if (next.stages.eligibility === 'failed') {
+      next.stages.pa_submission = 'skipped';
+      next.stageDetails.pa_submission = 'Skipped because eligibility failed';
+      next.stages.status_monitor = 'skipped';
+      next.stageDetails.status_monitor = 'Skipped because eligibility failed';
+      next.stages.final_outcome = 'failed';
+      next.stageDetails.final_outcome = 'Workflow stopped due to eligibility failure';
+      return next;
+    }
+
+    if (next.stages.eligibility === 'running') {
+      next.stages.pa_submission = 'waiting';
+      next.stageDetails.pa_submission = 'Waiting for eligibility completion';
+      next.stages.status_monitor = 'waiting';
+      next.stageDetails.status_monitor = 'Waiting for upstream stages';
+      next.stages.final_outcome = 'running';
+      next.stageDetails.final_outcome = 'Workflow in progress';
+      return next;
+    }
+
+    if (paRun) {
+      next.runIds.pa_submission = paRun.id;
+      next.stages.pa_submission = mapRunState(paRun.status);
+      next.stageDetails.pa_submission = getStageDetailFromRun(paRun);
+    } else {
+      const eligibilityDoneMs = eligibilityRun?.completedAt ? new Date(eligibilityRun.completedAt).getTime() : Date.now();
+      if (Date.now() - eligibilityDoneMs > TRACKER_STAGE_WAIT_TIMEOUT_MS) {
+        next.stages.pa_submission = 'skipped';
+        next.stageDetails.pa_submission = 'No PA submission run detected (likely PA not required)';
+      } else {
+        next.stages.pa_submission = 'waiting';
+        next.stageDetails.pa_submission = 'Waiting for PA submission run';
+      }
+    }
+
+    if (next.stages.pa_submission === 'failed') {
+      next.stages.status_monitor = 'skipped';
+      next.stageDetails.status_monitor = 'Skipped because PA submission failed';
+      next.stages.final_outcome = 'failed';
+      next.stageDetails.final_outcome = 'Workflow stopped due to PA submission failure';
+      return next;
+    }
+
+    if (next.stages.pa_submission === 'waiting' || next.stages.pa_submission === 'running') {
+      next.stages.status_monitor = 'waiting';
+      next.stageDetails.status_monitor = 'Waiting for PA submission completion';
+      next.stages.final_outcome = 'running';
+      next.stageDetails.final_outcome = 'Workflow in progress';
+      return next;
+    }
+
+    if (statusRun) {
+      next.runIds.status_monitor = statusRun.id;
+      next.stages.status_monitor = mapRunState(statusRun.status);
+      next.stageDetails.status_monitor = getStageDetailFromRun(statusRun);
+    } else {
+      const paDoneMs = paRun?.completedAt ? new Date(paRun.completedAt).getTime() : Date.now();
+      if (Date.now() - paDoneMs > TRACKER_STAGE_WAIT_TIMEOUT_MS) {
+        next.stages.status_monitor = 'skipped';
+        next.stageDetails.status_monitor = 'No status monitor run detected yet';
+      } else {
+        next.stages.status_monitor = 'waiting';
+        next.stageDetails.status_monitor = 'Waiting for status monitor run';
+      }
+    }
+
+    if (next.stages.status_monitor === 'failed') {
+      next.stages.final_outcome = 'failed';
+      next.stageDetails.final_outcome = 'Workflow stopped due to status monitor failure';
+      return next;
+    }
+
+    const runtimeMs = Date.now() - new Date(next.startedAt).getTime();
+    if (runtimeMs > TRACKER_MAX_RUNTIME_MS && next.stages.final_outcome !== 'succeeded') {
+      next.stages.final_outcome = 'failed';
+      next.stageDetails.final_outcome = 'Tracker timeout reached before workflow completion';
+      return next;
+    }
+
+    if (
+      next.stages.status_monitor === 'succeeded' ||
+      (next.stages.eligibility === 'succeeded' &&
+        next.stages.pa_submission === 'skipped' &&
+        next.stages.status_monitor === 'skipped')
+    ) {
+      next.stages.final_outcome = 'succeeded';
+      next.stageDetails.final_outcome = 'Workflow completed successfully';
+      return next;
+    }
+
+    next.stages.final_outcome = 'running';
+    next.stageDetails.final_outcome = 'Workflow in progress';
+    return next;
+  }, []);
+
+  const syncSessionWithRuns = useCallback(async (sessionId: string, mrn: string) => {
+    try {
+      const runs = await api.getAgentRunsByMrn(mrn);
+      let shouldStop = false;
+      updateSession(sessionId, (session) => {
+        const next = applyRunsToSession(session, runs);
+        const runtimeMs = Date.now() - new Date(next.startedAt).getTime();
+        if (runtimeMs > TRACKER_MAX_RUNTIME_MS && next.stages.final_outcome !== 'succeeded') {
+          next.stages.final_outcome = 'failed';
+          next.stageDetails.final_outcome = 'Tracker timeout reached before workflow completion';
+        }
+        next.polling = !(next.stages.final_outcome === 'succeeded' || next.stages.final_outcome === 'failed');
+        shouldStop = !next.polling;
+        return next;
+      });
+      if (shouldStop) {
+        stopSessionPolling(sessionId);
+      }
+    } catch (error) {
+      const parsed = parseApiError(error);
+      updateSession(sessionId, (session) => ({
+        ...session,
+        updatedAt: new Date().toISOString(),
+        lastError: parsed.message,
+      }));
+    }
+  }, [applyRunsToSession, stopSessionPolling, updateSession]);
+
+  const startSessionPolling = useCallback((sessionId: string, mrn: string) => {
+    stopSessionPolling(sessionId);
+    const tick = () => {
+      void syncSessionWithRuns(sessionId, mrn);
+    };
+    tick();
+    sessionPollersRef.current[sessionId] = window.setInterval(tick, TRACKER_POLL_INTERVAL_MS);
+  }, [stopSessionPolling, syncSessionWithRuns]);
+
+  const handleTrackerRefresh = useCallback(async () => {
+    setTrackerRefreshing(true);
+    try {
+      await data.refreshData();
+      const activeSessions = intakeSessions.filter((session) => session.polling && session.mrn);
+      await Promise.all(
+        activeSessions.map((session) => syncSessionWithRuns(session.sessionId, session.mrn || ''))
+      );
+    } finally {
+      setTrackerRefreshing(false);
+    }
+  }, [data, intakeSessions, syncSessionWithRuns]);
+
+  useEffect(() => {
+    return () => {
+      for (const sessionId of Object.keys(sessionPollersRef.current)) {
+        stopSessionPolling(sessionId);
+      }
+    };
+  }, [stopSessionPolling]);
 
   const handleDashboardUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -269,24 +523,102 @@ export function Home() {
       return;
     }
 
+    const sessionId = `intake-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const startedAt = new Date().toISOString();
+    const newSession: IntakeSessionTrace = {
+      sessionId,
+      fileName: selected.name,
+      startedAt,
+      updatedAt: startedAt,
+      polling: false,
+      missingFields: [],
+      stages: {
+        ...DEFAULT_TRACKER_STAGES,
+        upload: 'running',
+        final_outcome: 'waiting',
+      },
+      stageDetails: {
+        upload: 'Uploading PDF to intake endpoint',
+        intake: 'Waiting for intake response',
+        final_outcome: 'Waiting for workflow start',
+      },
+      runIds: {},
+    };
+
+    setIntakeSessions((prev) => [newSession, ...prev].slice(0, 6));
     setUploading(true);
     try {
       const result = await api.uploadPdfAndStartFlow(selected);
+      const acceptedAt = new Date().toISOString();
+      updateSession(sessionId, (session) => ({
+        ...session,
+        updatedAt: acceptedAt,
+        polling: true,
+        mrn: result.mrn,
+        intakeAcceptedAt: acceptedAt,
+        patientCreated: result.patientCreated,
+        patientUpdated: result.patientUpdated,
+        missingFields: result.missingFields,
+        lastHttpStatus: 200,
+        stages: {
+          ...session.stages,
+          upload: 'succeeded',
+          intake: 'succeeded',
+          eligibility: 'running',
+          final_outcome: 'running',
+        },
+        stageDetails: {
+          ...session.stageDetails,
+          upload: 'PDF uploaded successfully',
+          intake: `Intake accepted for ${result.mrn}`,
+          eligibility: 'Eligibility run queued',
+          final_outcome: 'Workflow in progress',
+        },
+        lastError: undefined,
+      }));
+
       await data.refreshData();
+      startSessionPolling(sessionId, result.mrn);
       toast.success(
         `Intake started for ${result.mrn} (${result.patientCreated ? 'new patient' : 'updated patient'})`
       );
       if (result.missingFields.length > 0) {
         toast.info(`Missing fields detected: ${result.missingFields.slice(0, 3).join(', ')}`);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      toast.error(message);
+    } catch (error) {
+      const parsed = parseApiError(error);
+      const reachedApi = parsed.httpStatus !== undefined;
+
+      updateSession(sessionId, (session) => ({
+        ...session,
+        updatedAt: new Date().toISOString(),
+        polling: false,
+        lastError: parsed.message,
+        lastHttpStatus: parsed.httpStatus,
+        stages: {
+          ...session.stages,
+          upload: reachedApi ? 'succeeded' : 'failed',
+          intake: reachedApi ? 'failed' : 'waiting',
+          final_outcome: 'failed',
+        },
+        stageDetails: {
+          ...session.stageDetails,
+          upload: reachedApi ? 'PDF reached intake endpoint' : 'Upload failed before reaching intake endpoint',
+          intake: reachedApi ? parsed.message : 'No intake response from API',
+          final_outcome: 'Workflow stopped due to intake failure',
+        },
+      }));
+
+      toast.error(parsed.httpStatus ? `API ${parsed.httpStatus}: ${parsed.message}` : parsed.message);
     } finally {
       setUploading(false);
       e.target.value = '';
     }
   };
+
+  const handleRetryUpload = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   if (data.loading) {
     return (
@@ -338,6 +670,16 @@ export function Home() {
           <div>
             <div className="text-[10px] tracking-[0.18em] text-muted-foreground/55 uppercase mb-1">New Intake</div>
             <div className="text-sm text-foreground">Upload a chart PDF to create/update patient and start full agent flow.</div>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`px-2 py-0.5 text-[10px] rounded border uppercase tracking-wider font-semibold ${
+                data.isDemoMode
+                  ? 'bg-warning/10 text-warning border-warning/30'
+                  : 'bg-success/10 text-success border-success/30'
+              }`}>
+                {data.isDemoMode ? 'Demo data mode' : 'Live data mode'}
+              </span>
+              <span className="text-[10px] text-muted-foreground/50">API {data.health.status === 'ok' ? 'connected' : 'offline'}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -357,6 +699,15 @@ export function Home() {
             </button>
           </div>
         </div>
+
+        <IntakeFlowTracker
+          sessions={intakeSessions}
+          refreshing={trackerRefreshing}
+          dataSourceMode={data.isDemoMode ? 'demo' : 'live'}
+          lastUpdatedAt={data.lastUpdatedAt}
+          onRefresh={handleTrackerRefresh}
+          onRetryUpload={handleRetryUpload}
+        />
 
         {/* ── Stat Bar ── */}
         <div className="grid grid-cols-3 gap-4">
@@ -381,8 +732,8 @@ export function Home() {
                 : `${data.paRequests.length} total cases tracked`,
               alert: data.urgentPendingCount > 0,
             },
-          ].map((stat, i) => (
-        <div className="rounded border border-border bg-card px-6 py-5">
+          ].map((stat) => (
+            <div key={stat.label} className="rounded border border-border bg-card px-6 py-5">
               <div className="text-[10px] tracking-[0.18em] text-muted-foreground/55 uppercase mb-2">{stat.label}</div>
               <div className={`text-6xl font-bold tabular-nums leading-none mb-2 ${stat.alert ? 'text-warning' : ''}`} style={{ fontFamily: '"Playfair Display", serif' }}>
                 {stat.value}

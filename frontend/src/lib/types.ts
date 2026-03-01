@@ -64,6 +64,35 @@ export interface AgentRun {
   result?: any;
 }
 
+export type WorkflowStageKey =
+  | 'upload'
+  | 'intake'
+  | 'eligibility'
+  | 'pa_submission'
+  | 'status_monitor'
+  | 'final_outcome';
+
+export type WorkflowStageState = 'waiting' | 'running' | 'succeeded' | 'failed' | 'skipped';
+
+export interface IntakeSessionTrace {
+  sessionId: string;
+  fileName: string;
+  startedAt: string;
+  updatedAt: string;
+  lastPolledAt?: string;
+  polling: boolean;
+  mrn?: string;
+  intakeAcceptedAt?: string;
+  patientCreated?: boolean;
+  patientUpdated?: boolean;
+  missingFields: string[];
+  stages: Record<WorkflowStageKey, WorkflowStageState>;
+  stageDetails: Partial<Record<WorkflowStageKey, string>>;
+  runIds: Partial<Record<'eligibility' | 'pa_submission' | 'status_monitor', string>>;
+  lastError?: string;
+  lastHttpStatus?: number;
+}
+
 export interface ApiHealth {
   status: 'ok' | 'offline';
   service: string;
