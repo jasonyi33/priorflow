@@ -20,7 +20,7 @@ export default function Header() {
           </a>
         </nav>
 
-        <a href="http://localhost:5173/signin" className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+        <a href="/signin" className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
           Sign Up
         </a>
       </div>

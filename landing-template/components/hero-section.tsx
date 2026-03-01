@@ -24,7 +24,7 @@ export default function HeroSection() {
               </div>
             </div>
 
-            <a href="http://localhost:5173/signin" className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+            <a href="/signin" className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
               Sign Up
               <ArrowRight className="w-4 h-4" />
             </a>
