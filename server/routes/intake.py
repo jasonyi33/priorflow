@@ -43,6 +43,7 @@ async def intake_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
         extracted = await asyncio.to_thread(extract_pdf_to_pa_fields, temp_pdf)
         logger.info("PDF extraction completed in %.1fs", _time.monotonic() - t0)
     except MiniMaxClientError as exc:
+        logger.error("MiniMax extraction failed for %s: %s", temp_pdf.name, exc, exc_info=True)
         temp_pdf.unlink(missing_ok=True)
         raise HTTPException(status_code=502, detail=f"MiniMax extraction failed: {exc}") from exc
     except Exception as exc:  # noqa: BLE001

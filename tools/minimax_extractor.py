@@ -25,12 +25,6 @@ def extract_pdf_to_pa_fields(pdf_path: Path) -> dict[str, Any]:
         raise MiniMaxClientError("No extractable text found in uploaded PDF")
 
     file_id = "local_pdf"
-    try:
-        file_id = client.upload_file(pdf_path)
-    except MiniMaxClientError:
-        # Upload metadata is optional for extraction; chat still uses local text.
-        file_id = "local_pdf"
-
     extracted = client.chat_extract_structured(raw_text)
     normalized = _normalize_extraction(extracted, file_id=file_id)
     return _fill_missing_from_text(raw_text, normalized)
