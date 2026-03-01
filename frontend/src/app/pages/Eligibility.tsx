@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FileCheck, RefreshCw, Search, CheckCircle2, XCircle, Building2, ShieldCheck, ShieldX, Clock3 } from 'lucide-react';
+import { FileCheck, RefreshCw, Search, CheckCircle2, XCircle, Building2, ShieldCheck, ShieldX, Clock3, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -18,6 +18,30 @@ export function Eligibility() {
   const eligible = results.filter((result) => result.isEligible).length;
   const notEligible = results.filter((result) => !result.isEligible).length;
   const uniqueInsurers = new Set(results.map((result) => result.insuranceProvider)).size;
+  const sortedPatients = useMemo(
+    () =>
+      [...patients].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [patients]
+  );
+  const checkedPatientIds = useMemo(
+    () => new Set(results.map((result) => result.patientId)),
+    [results]
+  );
+  const focusPatient = useMemo(
+    () => sortedPatients.find((patient) => !checkedPatientIds.has(patient.id)) ?? sortedPatients[0],
+    [checkedPatientIds, sortedPatients]
+  );
+  const focusPatientLastResult = useMemo(
+    () =>
+      focusPatient
+        ? [...results]
+            .filter((result) => result.patientId === focusPatient.id)
+            .sort((a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime())[0]
+        : undefined,
+    [focusPatient, results]
+  );
 
   const insurerBreakdown = useMemo(
     () =>
@@ -62,6 +86,52 @@ export function Eligibility() {
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
+        <div className="rounded border-2 border-primary/30 bg-primary/5 px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="size-2.5 rounded-full bg-primary animate-pulse mt-1.5" />
+            <div>
+              <div className="text-[10px] text-primary/80 uppercase tracking-[0.16em] mb-1">Tab Focus</div>
+              <div className="text-sm font-semibold">Next Eligibility Action</div>
+              {focusPatient ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  <span className="font-semibold text-foreground">{focusPatient.name}</span>
+                  {' · '}
+                  {focusPatient.insuranceProvider}
+                  {' · '}
+                  added {formatDistanceToNow(new Date(focusPatient.createdAt), { addSuffix: true })}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground mt-1">No patient records available.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {focusPatientLastResult ? (
+              <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] rounded border uppercase tracking-wider font-semibold ${
+                focusPatientLastResult.isEligible
+                  ? 'bg-success/10 text-success border-success/30'
+                  : 'bg-destructive/10 text-destructive border-destructive/30'
+              }`}>
+                <Clock3 className="size-3" />
+                last check {formatDistanceToNow(new Date(focusPatientLastResult.checkDate), { addSuffix: true })}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] rounded border bg-card uppercase tracking-wider font-semibold">
+                <UserPlus className="size-3" />
+                no check yet
+              </span>
+            )}
+            <button
+              onClick={() => focusPatient && setSelectedPatientId(focusPatient.id)}
+              disabled={!focusPatient}
+              className="px-3 py-1.5 text-[10px] rounded border border-border bg-card hover:bg-accent uppercase tracking-wider font-semibold disabled:opacity-40"
+            >
+              Select Focus Patient
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded border border-border bg-card px-5 py-4">
@@ -186,9 +256,23 @@ export function Eligibility() {
             ) : (
               <div className="divide-y divide-border overflow-y-auto">
                 {results.map((result) => (
-                  <div key={result.id} className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors">
+                  <div
+                    key={result.id}
+                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors ${
+                      focusPatient?.id === result.patientId
+                        ? 'bg-primary/5 border-l-2 border-primary/40 hover:bg-primary/10'
+                        : 'hover:bg-accent/35'
+                    }`}
+                  >
                     <div className="col-span-2 min-w-0">
-                      <div className="text-sm font-semibold truncate">{result.patientName}</div>
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        <span className="truncate">{result.patientName}</span>
+                        {focusPatient?.id === result.patientId && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider flex-none">
+                            focus
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="col-span-3 min-w-0">
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground truncate">

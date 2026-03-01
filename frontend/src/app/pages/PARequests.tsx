@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { FileText, CheckCircle2, XCircle, Clock, AlertCircle, Search, RefreshCw } from 'lucide-react';
+import { FileText, CheckCircle2, XCircle, Clock, AlertCircle, Search, RefreshCw, UserPlus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { StatusTimeline } from '../components/StatusTimeline';
 import { usePADashboardContext } from '../../lib/hooks';
@@ -64,6 +64,30 @@ export function PARequests() {
 
   const requests = dashboard.paRequests;
   const loading = dashboard.loading;
+  const newestPatient = useMemo(
+    () =>
+      [...dashboard.patients].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0],
+    [dashboard.patients]
+  );
+  const newestPatientRequest = useMemo(
+    () =>
+      newestPatient
+        ? [...requests]
+            .filter((request) => request.patientId === newestPatient.id)
+            .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())[0]
+        : undefined,
+    [newestPatient, requests]
+  );
+  const oldestPendingRequest = useMemo(
+    () =>
+      [...requests]
+        .filter((request) => PENDING_STATUSES.includes(request.status))
+        .sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime())[0],
+    [requests]
+  );
+  const focusRequest = oldestPendingRequest || newestPatientRequest;
 
   const filtered: Record<TabKey, PARequest[]> = {
     all: requests,
@@ -98,6 +122,13 @@ export function PARequests() {
     setRefreshing(false);
   };
 
+  const pinFocusRequest = () => {
+    if (!focusRequest) return;
+    setSearch(focusRequest.patientName);
+    setActiveTab(PENDING_STATUSES.includes(focusRequest.status) ? 'pending' : 'all');
+    setSelectedRequest(focusRequest);
+  };
+
   const relatedRun = selectedRequest
     ? dashboard.agentRuns
         .filter((run) => run.patientId === selectedRequest.patientId && run.type === 'pa_submission')
@@ -108,6 +139,49 @@ export function PARequests() {
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
+        <div className="rounded border-2 border-primary/30 bg-primary/5 px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="size-2.5 rounded-full bg-primary animate-pulse mt-1.5" />
+            <div>
+              <div className="text-[10px] text-primary/80 uppercase tracking-[0.16em] mb-1">Tab Focus</div>
+              <div className="text-sm font-semibold">Priority Request To Review</div>
+              {focusRequest ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  <span className="font-semibold text-foreground">{focusRequest.patientName}</span>
+                  {' · '}
+                  {focusRequest.procedureCode}
+                  {' · '}
+                  updated {formatDistanceToNow(new Date(focusRequest.lastUpdated), { addSuffix: true })}
+                </div>
+              ) : newestPatient ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  <span className="font-semibold text-foreground">{newestPatient.name}</span>
+                  {' · '}
+                  <UserPlus className="size-3 inline-block align-[-2px]" />
+                  {' '}
+                  newly registered, no PA request yet
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground mt-1">No PA requests yet.</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {focusRequest && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] rounded border bg-card uppercase tracking-wider font-semibold">
+                {PENDING_STATUSES.includes(focusRequest.status) ? 'oldest pending' : 'latest patient request'}
+              </span>
+            )}
+            <button
+              onClick={pinFocusRequest}
+              disabled={!focusRequest}
+              className="px-3 py-1.5 text-[10px] rounded border border-border bg-card hover:bg-accent uppercase tracking-wider font-semibold disabled:opacity-40"
+            >
+              Pin Focus In Table
+            </button>
+          </div>
+        </div>
+
         <div className="flex-1 rounded border border-border bg-card overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border gap-4">
             <div className="flex items-center gap-2">
@@ -176,6 +250,7 @@ export function PARequests() {
             <div className="divide-y divide-border overflow-y-auto">
               {items.map((request) => {
                 const stage = stageLabel(request.status);
+                const isFocusRequest = focusRequest?.id === request.id;
                 return (
                   <div
                     key={request.id}
@@ -183,10 +258,21 @@ export function PARequests() {
                       setSelectedRequest(request);
                       setDetailsOpen(true);
                     }}
-                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors cursor-pointer"
+                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors cursor-pointer ${
+                      isFocusRequest
+                        ? 'bg-primary/5 border-l-2 border-primary/40 hover:bg-primary/10'
+                        : 'hover:bg-accent/35'
+                    }`}
                   >
                     <div className="col-span-3 min-w-0">
-                      <div className="text-sm font-semibold truncate">{request.patientName}</div>
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        <span className="truncate">{request.patientName}</span>
+                        {isFocusRequest && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider flex-none">
+                            focus
+                          </span>
+                        )}
+                      </div>
                       {request.approvalCode && (
                         <div className="text-[10px] text-success/80 font-semibold tracking-wide">Auth: {request.approvalCode}</div>
                       )}

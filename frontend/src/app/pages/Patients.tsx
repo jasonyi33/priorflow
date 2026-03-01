@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { usePADashboardContext } from '../../lib/hooks';
-import { Search, FileText, Upload, Users, Building2, FileCheck, CalendarDays } from 'lucide-react';
+import { Search, FileText, Upload, Users, Building2, FileCheck, CalendarDays, UserPlus, Clock3 } from 'lucide-react';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 
 function age(dob: string): number {
@@ -30,6 +30,22 @@ export function Patients() {
   const recentlyAdded = patients.filter(
     (patient) => differenceInDays(new Date(), new Date(patient.createdAt)) <= 7
   ).length;
+  const newestPatient = useMemo(
+    () =>
+      [...patients].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0],
+    [patients]
+  );
+  const newInLast24h = patients.filter(
+    (patient) => Date.now() - new Date(patient.createdAt).getTime() <= 24 * 60 * 60 * 1000
+  ).length;
+  const newestPatientActivePAs = newestPatient
+    ? dashboard.paRequests.filter(
+        (request) =>
+          request.patientId === newestPatient.id && !['approved', 'denied'].includes(request.status)
+      ).length
+    : 0;
 
   const stats = [
     { label: 'Total Patients', value: String(patients.length), sub: 'on record', icon: Users },
@@ -42,6 +58,38 @@ export function Patients() {
     <div className="flex flex-col relative w-full min-h-full">
       <div className="h-3 bg-muted shrink-0" />
       <div className="flex-1 flex flex-col gap-4 px-3 lg:px-5 pb-4 bg-background">
+        <div className="rounded border-2 border-primary/30 bg-primary/5 px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="size-2.5 rounded-full bg-primary animate-pulse mt-1.5" />
+            <div>
+              <div className="text-[10px] text-primary/80 uppercase tracking-[0.16em] mb-1">Tab Focus</div>
+              <div className="text-sm font-semibold">Newest Patient Registration</div>
+              {newestPatient ? (
+                <div className="text-xs text-muted-foreground mt-1">
+                  <span className="font-semibold text-foreground">{newestPatient.name}</span>
+                  {' · '}
+                  {newestPatient.memberId}
+                  {' · '}
+                  added {formatDistanceToNow(new Date(newestPatient.createdAt), { addSuffix: true })}
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground mt-1">No registered patients yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] rounded border bg-card uppercase tracking-wider font-semibold">
+              <UserPlus className="size-3" />
+              {newInLast24h} new / 24h
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 text-[10px] rounded border bg-card uppercase tracking-wider font-semibold">
+              <Clock3 className="size-3" />
+              {newestPatientActivePAs} active for latest patient
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
             <div key={stat.label} className="rounded border border-border bg-card px-5 py-4">
@@ -111,14 +159,26 @@ export function Patients() {
                 const activePAs = dashboard.paRequests.filter(
                   (request) => request.patientId === patient.id && !['approved', 'denied'].includes(request.status)
                 ).length;
+                const isNewestPatient = newestPatient?.id === patient.id;
 
                 return (
                   <div
                     key={patient.id}
-                    className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors"
+                    className={`grid grid-cols-12 gap-x-3 items-center px-5 py-3 transition-colors ${
+                      isNewestPatient
+                        ? 'bg-primary/5 border-l-2 border-primary/40 hover:bg-primary/10'
+                        : 'hover:bg-accent/35'
+                    }`}
                   >
                     <div className="col-span-3 min-w-0">
-                      <div className="text-sm font-semibold truncate">{patient.name}</div>
+                      <div className="text-sm font-semibold truncate flex items-center gap-1.5">
+                        <span className="truncate">{patient.name}</span>
+                        {isNewestPatient && (
+                          <span className="px-1.5 py-0.5 text-[9px] bg-primary/15 text-primary border border-primary/25 rounded font-semibold uppercase tracking-wider flex-none">
+                            newest
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground/60 truncate">
                         DOB {new Date(patient.dateOfBirth).toLocaleDateString()} · Added{' '}
                         {formatDistanceToNow(new Date(patient.createdAt), { addSuffix: true })}
