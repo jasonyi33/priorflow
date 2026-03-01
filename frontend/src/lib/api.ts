@@ -100,6 +100,8 @@ function toEligibilityResult(data: any, patientName?: string): EligibilityResult
 
 const PA_STATUS_MAP: Record<string, PAStatus> = {
   pending: 'pending',
+  checking_eligibility: 'checking_eligibility',
+  generating_request: 'generating_request',
   submitted: 'submitting',
   approved: 'approved',
   denied: 'denied',

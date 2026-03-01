@@ -20,6 +20,8 @@ from enum import Enum
 
 class PAStatusEnum(str, Enum):
     PENDING = "pending"
+    CHECKING_ELIGIBILITY = "checking_eligibility"
+    GENERATING_REQUEST = "generating_request"
     SUBMITTED = "submitted"
     APPROVED = "approved"
     DENIED = "denied"

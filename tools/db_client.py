@@ -224,11 +224,13 @@ def _merge_status(existing_status: str | None, incoming_status: str) -> str:
 
     status_rank = {
         PAStatusEnum.PENDING.value: 0,
-        PAStatusEnum.SUBMITTED.value: 1,
-        PAStatusEnum.MORE_INFO_NEEDED.value: 2,
-        PAStatusEnum.APPROVED.value: 3,
-        PAStatusEnum.DENIED.value: 3,
-        PAStatusEnum.CANCELLED.value: 3,
+        PAStatusEnum.CHECKING_ELIGIBILITY.value: 1,
+        PAStatusEnum.GENERATING_REQUEST.value: 2,
+        PAStatusEnum.SUBMITTED.value: 3,
+        PAStatusEnum.MORE_INFO_NEEDED.value: 4,
+        PAStatusEnum.APPROVED.value: 5,
+        PAStatusEnum.DENIED.value: 5,
+        PAStatusEnum.CANCELLED.value: 5,
     }
     existing_rank = status_rank.get(existing_status, 0)
     incoming_rank = status_rank.get(incoming_status, 0)
