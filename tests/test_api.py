@@ -121,21 +121,9 @@ def test_pa_list_fixture():
     assert isinstance(data, list)
 
 
-def test_pa_list_merges_local_and_convex_results(monkeypatch, tmp_path):
+def test_pa_list_convex_first(monkeypatch):
+    """When Convex is enabled, PA list comes from Convex (not local files)."""
     import server.routes.pa_requests as pa_requests
-
-    local_payload = {
-        "mrn": "MRN-LOCAL",
-        "portal": "covermymeds",
-        "medication_or_procedure": "Humira 40mg",
-        "status": "pending",
-        "fields_filled": [],
-        "gaps_detected": [],
-        "created_at": "2026-03-01T00:00:00+00:00",
-        "updated_at": "2026-03-01T00:00:00+00:00",
-    }
-    with open(tmp_path / "pa_submission_MRN-LOCAL.json", "w") as f:
-        json.dump(local_payload, f)
 
     class FakeConvexClient:
         enabled = True
@@ -155,15 +143,50 @@ def test_pa_list_merges_local_and_convex_results(monkeypatch, tmp_path):
                 }
             ]
 
-    monkeypatch.setattr(pa_requests, "OUTPUT_DIR", tmp_path)
     monkeypatch.setattr(pa_requests, "convex_client", FakeConvexClient())
 
     resp = client.get("/api/pa")
     assert resp.status_code == 200
     data = resp.json()
     mrns = {item.get("mrn") for item in data}
-    assert "MRN-LOCAL" in mrns
     assert "MRN-REMOTE" in mrns
+
+
+def test_pa_list_overlays_in_memory(monkeypatch):
+    """In-memory orchestrator results appear if not yet persisted to Convex."""
+    import server.routes.pa_requests as pa_requests
+    from server.services import orchestrator
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            return [
+                {
+                    "mrn": "MRN-CONVEX",
+                    "portal": "covermymeds",
+                    "status": "approved",
+                }
+            ]
+
+    original_results = dict(orchestrator._pa_results)
+    orchestrator._pa_results["MRN-INMEM"] = {
+        "mrn": "MRN-INMEM",
+        "portal": "covermymeds",
+        "status": "pending",
+    }
+    monkeypatch.setattr(pa_requests, "convex_client", FakeConvexClient())
+
+    try:
+        resp = client.get("/api/pa")
+        assert resp.status_code == 200
+        data = resp.json()
+        mrns = {item.get("mrn") for item in data}
+        assert "MRN-CONVEX" in mrns
+        assert "MRN-INMEM" in mrns
+    finally:
+        orchestrator._pa_results.clear()
+        orchestrator._pa_results.update(original_results)
 
 
 def test_agents_runs_fixture():
