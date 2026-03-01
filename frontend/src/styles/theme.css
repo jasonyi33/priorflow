@@ -199,7 +199,7 @@
 
   /* Only actual data / code fields stay monospace */
   input, textarea, select, code, pre {
-    font-family: "IBM Plex Mono", monospace;
+    font-family: "Playfair Display", "Georgia", serif;
   }
 }
 

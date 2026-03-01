@@ -380,7 +380,7 @@ export function Layout() {
           <span>{dateInfo.restOfDate}</span>
         </div>
         <div className="text-center">
-          <div className="text-5xl font-bold tracking-tight font-mono" suppressHydrationWarning>
+          <div className="text-5xl font-bold tracking-tight" suppressHydrationWarning>
             {formatTime(currentTime)}
           </div>
         </div>
@@ -624,7 +624,7 @@ export function Layout() {
   // RIGHT PANEL
   // ═══════════════════════════════════════════════
   const RightPanel = () => (
-    <div className="flex flex-col h-screen sticky top-0 overflow-hidden py-sides gap-3">
+    <div className="flex flex-col h-screen sticky top-0 overflow-hidden px-3 py-sides gap-3">
       <WidgetSection />
       <NotificationsSection />
     </div>

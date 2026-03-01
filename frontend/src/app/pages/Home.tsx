@@ -57,7 +57,7 @@ function FlowConnector({ active, throughput }: { active: boolean; throughput: nu
         </svg>
       </div>
       {throughput > 0 && (
-        <span className="text-[9px] font-mono text-muted-foreground/50 tracking-wider">{throughput} total</span>
+        <span className="text-[9px] text-muted-foreground/50 tracking-wider">{throughput} total</span>
       )}
     </div>
   );
@@ -114,7 +114,7 @@ function PipelineStage({
           {count}
         </div>
         {oldest && (
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground/55 mb-3">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/55 mb-3">
             <Clock className="size-3 flex-none" />
             oldest: {relativeTime(oldest.lastUpdated)} in queue
           </div>
@@ -135,25 +135,25 @@ function PipelineStage({
               <div className="flex items-center gap-2.5 py-1">
                 <Check className="size-4 flex-none text-success" />
                 <span className="text-base font-bold tabular-nums text-success">{approved}</span>
-                <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">approved</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">approved</span>
               </div>
             )}
             {denied > 0 && (
               <div className="flex items-center gap-2.5 py-1">
                 <X className="size-4 flex-none text-destructive" />
                 <span className="text-base font-bold tabular-nums text-destructive">{denied}</span>
-                <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">denied</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">denied</span>
               </div>
             )}
             {moreInfo > 0 && (
               <div className="flex items-center gap-2.5 py-1">
                 <Info className="size-4 flex-none text-warning" />
                 <span className="text-base font-bold tabular-nums text-warning">{moreInfo}</span>
-                <span className="text-xs text-muted-foreground font-mono uppercase tracking-wider">info needed</span>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">info needed</span>
               </div>
             )}
             {count === 0 && (
-              <span className="text-[10px] font-mono text-muted-foreground/25 uppercase tracking-widest">No determinations</span>
+              <span className="text-[10px] text-muted-foreground/25 uppercase tracking-widest">No determinations</span>
             )}
           </div>
         ) : (
@@ -168,18 +168,18 @@ function PipelineStage({
                     }`} />
                     <span className="text-base font-semibold truncate leading-tight">{req.patientName}</span>
                   </div>
-                  <div className="pl-4 text-xs font-mono text-muted-foreground/60 truncate">{req.procedureCode} · {req.procedureName.split(' ').slice(0, 4).join(' ')}</div>
-                  {patient && <div className="pl-4 text-[11px] font-mono text-muted-foreground/40 truncate">{patient.insuranceProvider}</div>}
+                  <div className="pl-4 text-xs text-muted-foreground/60 truncate">{req.procedureCode} · {req.procedureName.split(' ').slice(0, 4).join(' ')}</div>
+                  {patient && <div className="pl-4 text-[11px] text-muted-foreground/40 truncate">{patient.insuranceProvider}</div>}
                 </div>
               );
             })}
             {requests.length > 3 && (
-              <div className="text-xs font-mono text-muted-foreground/45 px-3 tracking-wider">
+              <div className="text-xs text-muted-foreground/45 px-3 tracking-wider">
                 +{requests.length - 3} more in queue
               </div>
             )}
             {requests.length === 0 && (
-              <span className="text-[10px] font-mono text-muted-foreground/25 uppercase tracking-widest">Queue empty</span>
+              <span className="text-[10px] text-muted-foreground/25 uppercase tracking-widest">Queue empty</span>
             )}
           </div>
         )}
@@ -209,7 +209,7 @@ function NeedsAttention({ requests, patients }: { requests: PARequest[]; patient
           <div className="px-5 py-10 text-center">
             <Check className="size-5 text-success mx-auto mb-2.5" />
             <p className="text-sm text-muted-foreground">All cases on track</p>
-            <p className="text-xs font-mono text-muted-foreground/50 mt-1">No immediate action required</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">No immediate action required</p>
           </div>
         ) : (
           urgent.map(req => {
@@ -221,19 +221,19 @@ function NeedsAttention({ requests, patients }: { requests: PARequest[]; patient
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-1.5">
                     <span className="text-lg font-semibold truncate" style={{ fontFamily: '"Playfair Display", serif' }}>{req.patientName}</span>
-                    <span className="text-xs font-mono text-muted-foreground/45 tabular-nums">{relativeTime(req.lastUpdated)}</span>
+                    <span className="text-xs text-muted-foreground/45 tabular-nums">{relativeTime(req.lastUpdated)}</span>
                   </div>
                   <div className="text-sm text-muted-foreground truncate mb-1.5">{req.procedureName}</div>
-                  {patient && <div className="text-xs font-mono text-muted-foreground/50 truncate mb-2">{patient.memberId} · {patient.insuranceProvider}</div>}
+                  {patient && <div className="text-xs text-muted-foreground/50 truncate mb-2">{patient.memberId} · {patient.insuranceProvider}</div>}
                   {isMoreInfo ? (
-                    <div className="text-xs font-mono text-warning font-medium">→ Additional documentation required</div>
+                    <div className="text-xs text-warning font-medium">→ Additional documentation required</div>
                   ) : (
-                    <div className="text-xs font-mono text-destructive font-medium">
+                    <div className="text-xs text-destructive font-medium">
                       {req.denialReason ? `→ Denied: ${req.denialReason}` : '→ Authorization denied — review for appeal'}
                     </div>
                   )}
                 </div>
-                <span className={`text-[9px] font-mono px-2 py-1 rounded border font-bold uppercase tracking-wider flex-none ${
+                <span className={`text-[9px] px-2 py-1 rounded border font-bold uppercase tracking-wider flex-none ${
                   isMoreInfo
                     ? 'bg-warning/10 text-warning border-warning/30'
                     : 'bg-destructive/10 text-destructive border-destructive/30'
@@ -323,11 +323,11 @@ export function Home() {
             },
           ].map((stat, i) => (
         <div className="rounded border border-border bg-card px-6 py-5">
-              <div className="text-[10px] font-mono tracking-[0.18em] text-muted-foreground/55 uppercase mb-2">{stat.label}</div>
+              <div className="text-[10px] tracking-[0.18em] text-muted-foreground/55 uppercase mb-2">{stat.label}</div>
               <div className={`text-6xl font-bold tabular-nums leading-none mb-2 ${stat.alert ? 'text-warning' : ''}`} style={{ fontFamily: '"Playfair Display", serif' }}>
                 {stat.value}
               </div>
-              <div className={`text-sm font-mono ${stat.alert ? 'text-warning/80' : 'text-muted-foreground/50'}`}>
+              <div className={`text-sm ${stat.alert ? 'text-warning/80' : 'text-muted-foreground/50'}`}>
                 {stat.sub}
               </div>
             </div>
@@ -340,21 +340,21 @@ export function Home() {
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-3">
               <span className="inline-block size-2 bg-foreground rounded-sm rotate-45" />
-              <span className="text-sm font-mono font-semibold uppercase tracking-widest">
+              <span className="text-sm font-semibold uppercase tracking-widest">
                 Prior Authorization Pipeline
               </span>
-              <span className="text-xs font-mono text-muted-foreground/40 uppercase tracking-wider">
+              <span className="text-xs text-muted-foreground/40 uppercase tracking-wider">
                 — Live Agent Workflow
               </span>
             </div>
             <div className="flex items-center gap-4">
               {inFlightCount > 0 && (
-                <span className="flex items-center gap-2 text-xs font-mono text-foreground/70">
+                <span className="flex items-center gap-2 text-xs text-foreground/70">
                   <span className="size-2 rounded-full bg-foreground/70 animate-pulse inline-block" />
                   {inFlightCount} active
                 </span>
               )}
-              <span className="text-[10px] font-mono text-muted-foreground/40">
+              <span className="text-[10px] text-muted-foreground/40">
                 {data.paRequests.length} total requests
               </span>
             </div>
@@ -394,24 +394,24 @@ export function Home() {
           {/* Pipeline footer: aggregate bar */}
           <div className="px-5 pb-5">
             <div className="border border-border/50 rounded px-4 py-3 bg-accent/30 flex items-center gap-6">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/50">Pipeline summary</span>
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">Pipeline summary</span>
               <div className="flex-1 flex items-center gap-2">
                 {stageData.map((stage, idx) => {
                   const cnt = stage.id === 'decision' ? decisionRequests.length : stage.requests.length;
                   const pct = data.paRequests.length > 0 ? (cnt / data.paRequests.length) * 100 : 0;
                   return (
                     <div key={stage.id} className="flex items-center gap-1.5">
-                      <div className="text-[9px] font-mono text-muted-foreground/45 uppercase">{stage.roman}</div>
+                      <div className="text-[9px] text-muted-foreground/45 uppercase">{stage.roman}</div>
                       <div className="h-1.5 rounded-full bg-border min-w-[2rem] overflow-hidden" style={{ width: `${Math.max(pct, 4)}px`, minWidth: '2rem' }}>
                         <div className="h-full bg-foreground/50 rounded-full" style={{ width: `${pct > 0 ? 100 : 0}%` }} />
                       </div>
-                      <div className="text-[9px] font-mono text-muted-foreground/55 tabular-nums">{cnt}</div>
+                      <div className="text-[9px] text-muted-foreground/55 tabular-nums">{cnt}</div>
                       {idx < stageData.length - 1 && <span className="text-muted-foreground/25 text-xs">·</span>}
                     </div>
                   );
                 })}
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground/50 tabular-nums">{data.paRequests.length} total</span>
+              <span className="text-[10px] text-muted-foreground/50 tabular-nums">{data.paRequests.length} total</span>
             </div>
           </div>
         </div>
@@ -426,9 +426,9 @@ export function Home() {
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <span className="inline-block size-2 bg-foreground rounded-sm rotate-45" />
-                <span className="text-sm font-mono font-semibold uppercase tracking-widest">Case Registry</span>
+                <span className="text-sm font-semibold uppercase tracking-widest">Case Registry</span>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground/40 uppercase tracking-wider">
+              <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider">
                 Recent — {data.paRequests.length} total
               </span>
             </div>
@@ -437,7 +437,7 @@ export function Home() {
               <div className="py-14 text-center text-sm text-muted-foreground">No cases on record</div>
             ) : (
               <div className="divide-y divide-border">
-                <div className="grid grid-cols-12 gap-x-3 px-5 py-2.5 text-[10px] font-mono font-semibold uppercase tracking-[0.14em] text-muted-foreground/45 border-b border-border/50">
+                <div className="grid grid-cols-12 gap-x-3 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/45 border-b border-border/50">
                   <span className="col-span-3">Patient</span>
                   <span className="col-span-4">Procedure</span>
                   <span className="col-span-2">Insurer</span>
@@ -451,21 +451,21 @@ export function Home() {
                     <div key={req.id} className="grid grid-cols-12 gap-x-3 items-center px-5 py-3 hover:bg-accent/35 transition-colors cursor-pointer">
                       <div className="col-span-3 min-w-0 overflow-hidden">
                         <div className="text-sm font-semibold truncate">{req.patientName}</div>
-                        {patient && <div className="text-[10px] font-mono text-muted-foreground/45 truncate">{patient.memberId}</div>}
+                        {patient && <div className="text-[10px] text-muted-foreground/45 truncate">{patient.memberId}</div>}
                       </div>
                       <div className="col-span-4 min-w-0 overflow-hidden">
                         <div className="text-sm truncate">{req.procedureName}</div>
-                        <div className="text-[10px] font-mono text-muted-foreground/45 truncate">{req.procedureCode}</div>
+                        <div className="text-[10px] text-muted-foreground/45 truncate">{req.procedureCode}</div>
                       </div>
                       <div className="col-span-2 min-w-0 overflow-hidden text-sm text-muted-foreground truncate">
                         {patient?.insuranceProvider ?? '—'}
                       </div>
                       <div className="col-span-2 min-w-0">
-                        <span className={`inline-flex px-2 py-0.5 text-[10px] font-mono rounded font-semibold uppercase tracking-wide ${cfg.cls}`}>
+                        <span className={`inline-flex px-2 py-0.5 text-[10px] rounded font-semibold uppercase tracking-wide ${cfg.cls}`}>
                           {cfg.label}
                         </span>
                       </div>
-                      <div className="col-span-1 text-[10px] font-mono text-muted-foreground/40 text-right tabular-nums whitespace-nowrap">
+                      <div className="col-span-1 text-[10px] text-muted-foreground/40 text-right tabular-nums whitespace-nowrap">
                         {relativeTime(req.lastUpdated)}
                       </div>
                     </div>
