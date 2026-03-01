@@ -99,7 +99,7 @@ function PipelineStage({
         : 'border-border/35 bg-card/40'
     }`}>
       {/* Stage header */}
-      <div className={`px-5 py-4 border-b ${active ? 'border-border' : 'border-border/30'}`}>
+      <div className={`px-3 py-3 border-b ${active ? 'border-border' : 'border-border/30'}`}>
         <div className="text-[11px] text-muted-foreground/50 tracking-[0.18em] mb-1.5 uppercase">
           {stage.roman} — {stage.sub}
         </div>
@@ -109,7 +109,7 @@ function PipelineStage({
       </div>
 
       {/* Count + meta */}
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-3 pt-3 pb-3">
         <div className={`text-6xl font-bold tabular-nums leading-none mb-3 ${active ? 'text-foreground' : 'text-muted-foreground/18'}`} style={{ fontFamily: '"Playfair Display", serif' }}>
           {count}
         </div>
@@ -255,7 +255,7 @@ export function Home() {
 
   if (data.loading) {
     return (
-      <div className="flex flex-col gap-5 px-4 lg:px-7 py-6 bg-background min-h-full ring-2 ring-pop">
+      <div className="flex flex-col gap-4 px-3 lg:px-5 py-4 bg-background min-h-full ring-2 ring-pop">
         <div className="grid grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => <div key={i} className="h-24 bg-muted rounded animate-pulse" />)}
         </div>
@@ -296,7 +296,7 @@ export function Home() {
 
   return (
     <div className="flex flex-col relative w-full gap-1 min-h-full">
-      <div className="min-h-full flex-1 flex flex-col gap-5 px-4 lg:px-7 py-6 ring-2 ring-pop bg-background">
+      <div className="min-h-full flex-1 flex flex-col gap-4 px-3 lg:px-5 py-4 ring-2 ring-pop bg-background">
 
         {/* ── Stat Bar ── */}
         <div className="grid grid-cols-3 gap-4">

@@ -201,13 +201,20 @@ export function Layout() {
   // SIDEBAR CONTENT
   // ═══════════════════════════════════════════════
   const SidebarContent = () => (
-    <div className="flex h-full flex-col p-3 gap-3">
-      {/* Brand */}
-      <div className="flex items-center gap-2.5 px-1 pt-1 pb-2">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <PriorFlowLogo className="size-6" />
+    <div className="flex h-full flex-col p-2 gap-2">
+      {/* Brand + Collapse toggle */}
+      <div className="flex items-center gap-2 px-1 pt-1 pb-1">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <PriorFlowLogo className="size-5" />
         </div>
-        <span className="text-lg font-bold tracking-tight">PriorFlow</span>
+        <span className="flex-1 text-base font-bold tracking-tight">PriorFlow</span>
+        <button
+          onClick={() => setSidebarCollapsed(true)}
+          className="flex items-center justify-center size-7 rounded text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="size-3.5" />
+        </button>
       </div>
 
       {/* Navigation */}
@@ -326,16 +333,9 @@ export function Layout() {
         )}
       </div>
 
-      {/* Collapse toggle */}
-      <div className="px-2.5 pb-1 flex items-center justify-between">
+      {/* Version */}
+      <div className="px-2 pb-1">
         <span className="text-[9px] text-muted-foreground/30 tracking-wider">PRIORFLOW v2.4.1</span>
-        <button
-          onClick={() => setSidebarCollapsed(true)}
-          className="flex items-center justify-center size-6 rounded text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors"
-          title="Collapse sidebar"
-        >
-          <PanelLeftClose className="size-3.5" />
-        </button>
       </div>
     </div>
   );
@@ -344,17 +344,19 @@ export function Layout() {
   // COLLAPSED SIDEBAR (icon strip)
   // ═══════════════════════════════════════════════
   const CollapsedSidebar = () => (
-    <div className="flex flex-col items-center h-full py-3 gap-1.5">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground mb-2">
-        <PriorFlowLogo className="size-5" />
-      </div>
+    <div className="flex flex-col items-center py-2 gap-1.5">
+      {/* Expand button at top */}
+      <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
+        className="flex items-center justify-center size-8 rounded text-muted-foreground/50 hover:text-foreground hover:bg-accent transition-colors mb-1">
+        <PanelLeftOpen className="size-4" />
+      </button>
       {navigation.map((item) => {
         const isActive = location.pathname === item.href;
         const Icon = item.icon;
         return (
           <Link key={item.name} to={item.href} title={item.name}
             className={cn(
-              'flex items-center justify-center size-9 rounded-md transition-colors',
+              'flex items-center justify-center size-8 rounded-md transition-colors',
               isActive ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground/50 hover:bg-sidebar-accent hover:text-sidebar-foreground',
               item.locked && 'pointer-events-none opacity-30'
             )}
@@ -363,12 +365,6 @@ export function Layout() {
           </Link>
         );
       })}
-      <div className="mt-auto">
-        <button onClick={() => setSidebarCollapsed(false)} title="Expand sidebar"
-          className="flex items-center justify-center size-9 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors">
-          <PanelLeftOpen className="size-4" />
-        </button>
-      </div>
     </div>
   );
 
@@ -639,7 +635,7 @@ export function Layout() {
   // ═══════════════════════════════════════════════
   return (
     <PADashboardContext.Provider value={dashboardData}>
-      <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-gap lg:px-sides">
+      <div className="flex w-full min-h-screen">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div 
@@ -649,8 +645,11 @@ export function Layout() {
         )}
 
         {/* Left Sidebar - Desktop */}
-        <aside className={cn('hidden lg:block top-0 relative transition-all', sidebarCollapsed ? 'col-span-1' : 'col-span-2')}>
-          <div className="sticky top-0 py-sides min-h-screen max-h-screen overflow-auto rounded-lg border border-border bg-card">
+        <aside className={cn(
+          'hidden lg:flex flex-col flex-none sticky top-0 h-screen bg-card border-r border-border overflow-hidden transition-[width] duration-200 ease-in-out',
+          sidebarCollapsed ? 'w-14' : 'w-52'
+        )}>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {sidebarCollapsed ? <CollapsedSidebar /> : <SidebarContent />}
           </div>
         </aside>
@@ -676,17 +675,17 @@ export function Layout() {
           </button>
           <div className="flex items-center gap-2">
             <PriorFlowMark className="size-5 text-primary" />
-            <span className="text-xs font-semibold tracking-wider font-mono">PriorFlow</span>
+            <span className="text-xs font-semibold tracking-wider">PriorFlow</span>
           </div>
         </header>
 
         {/* Main content */}
-        <div className={cn('col-span-1 pt-12 lg:pt-0', sidebarCollapsed ? 'lg:col-span-8' : 'lg:col-span-7')}>
+        <div className="flex-1 min-w-0 pt-12 lg:pt-0">
           <Outlet />
         </div>
 
         {/* Right Panel - Desktop only */}
-        <div className="col-span-3 hidden lg:block">
+        <div className="hidden lg:block w-[260px] flex-none border-l border-border">
           <RightPanel />
         </div>
       </div>
