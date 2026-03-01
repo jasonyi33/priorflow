@@ -16,7 +16,7 @@ export function SignIn() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 1200));
     setLoading(false);
-    navigate('/');
+    navigate('/app');
   };
 
   return (
