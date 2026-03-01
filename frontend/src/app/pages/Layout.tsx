@@ -358,12 +358,16 @@ export function Layout() {
     </div>
   );
 
+  const isRunningAgent = (n: Notification) => n.id.startsWith('run-') && n.title.includes('RUNNING');
+
   const NotificationItem = ({ notification }: { notification: Notification }) => (
     <div
       className={cn(
         'group p-2.5 rounded-lg border transition-all duration-200 hover:shadow-sm',
         !notification.read && 'cursor-pointer',
-        notification.read ? 'bg-card/50 border-border/30' : 'bg-card border-border shadow-sm'
+        isRunningAgent(notification)
+          ? 'bg-blue-500/5 border-blue-500/30 shadow-sm'
+          : notification.read ? 'bg-card/50 border-border/30' : 'bg-card border-border shadow-sm'
       )}
       onClick={() => {
         if (!notification.read) {
@@ -372,7 +376,14 @@ export function Layout() {
       }}
     >
       <div className="flex items-start gap-2.5">
-        <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', getTypeColor(notification.type))} />
+        {isRunningAgent(notification) ? (
+          <span className="relative mt-1.5 flex-shrink-0 w-2 h-2">
+            <span className="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-75" />
+            <span className="relative block w-2 h-2 rounded-full bg-blue-500" />
+          </span>
+        ) : (
+          <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', getTypeColor(notification.type))} />
+        )}
         <div className="flex-1 min-w-0">
           <h4 className={cn('text-sm leading-snug mb-1', !notification.read ? 'font-semibold' : 'font-medium')}>
             {notification.title}
@@ -382,7 +393,9 @@ export function Layout() {
           </p>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
-              {getPriorityBadge(notification.priority)}
+              {isRunningAgent(notification)
+                ? <span className="px-1.5 py-0.5 text-[9px] bg-blue-500/10 text-blue-600 rounded tracking-wider font-semibold border border-blue-500/20">ACTIVE</span>
+                : getPriorityBadge(notification.priority)}
               <span className="text-[10px] text-muted-foreground/50">
                 {formatTimestamp(notification.timestamp)}
               </span>

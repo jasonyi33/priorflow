@@ -97,7 +97,7 @@ export function buildLiveNotifications(params: {
     message: `${run.patientName} · ${run.logs[run.logs.length - 1] || 'No log output yet'}`,
     timestamp: run.completedAt || run.startedAt,
     type: run.status === 'completed' ? 'success' : run.status === 'failed' ? 'error' : 'info',
-    priority: run.status === 'failed' ? 'high' : run.status === 'running' ? 'low' : 'medium',
+    priority: run.status === 'failed' ? 'high' : run.status === 'running' ? 'high' : 'medium',
   }));
 
   const eligibilityNotifications = params.eligibilityResults.slice(0, 6).map((result): LiveNotification => ({
@@ -110,6 +110,12 @@ export function buildLiveNotifications(params: {
   }));
 
   return [...paNotifications, ...runNotifications, ...eligibilityNotifications]
-    .sort((a, b) => toTimestamp(b.timestamp) - toTimestamp(a.timestamp))
+    .sort((a, b) => {
+      // Pin actively running agents to top
+      const aRunning = a.id.startsWith('run-') && a.title.includes('RUNNING') ? 1 : 0;
+      const bRunning = b.id.startsWith('run-') && b.title.includes('RUNNING') ? 1 : 0;
+      if (aRunning !== bRunning) return bRunning - aRunning;
+      return toTimestamp(b.timestamp) - toTimestamp(a.timestamp);
+    })
     .slice(0, 24);
 }
