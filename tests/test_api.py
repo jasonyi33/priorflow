@@ -1,5 +1,6 @@
 from pathlib import Path
 from fastapi.testclient import TestClient
+import json
 
 from server.main import app
 
@@ -41,6 +42,51 @@ def test_pa_list_fixture():
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
+
+
+def test_pa_list_merges_local_and_convex_results(monkeypatch, tmp_path):
+    import server.routes.pa_requests as pa_requests
+
+    local_payload = {
+        "mrn": "MRN-LOCAL",
+        "portal": "covermymeds",
+        "medication_or_procedure": "Humira 40mg",
+        "status": "pending",
+        "fields_filled": [],
+        "gaps_detected": [],
+        "created_at": "2026-03-01T00:00:00+00:00",
+        "updated_at": "2026-03-01T00:00:00+00:00",
+    }
+    with open(tmp_path / "pa_submission_MRN-LOCAL.json", "w") as f:
+        json.dump(local_payload, f)
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            assert function_name == "paRequests:list"
+            return [
+                {
+                    "mrn": "MRN-REMOTE",
+                    "portal": "covermymeds",
+                    "medicationOrProcedure": "Stelara 45mg",
+                    "status": "submitted",
+                    "fieldsFilled": [],
+                    "gapsDetected": [],
+                    "createdAt": 1740787200000,
+                    "updatedAt": 1740787200000,
+                }
+            ]
+
+    monkeypatch.setattr(pa_requests, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(pa_requests, "convex_client", FakeConvexClient())
+
+    resp = client.get("/api/pa")
+    assert resp.status_code == 200
+    data = resp.json()
+    mrns = {item.get("mrn") for item in data}
+    assert "MRN-LOCAL" in mrns
+    assert "MRN-REMOTE" in mrns
 
 
 def test_agents_runs_fixture():

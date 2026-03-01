@@ -34,6 +34,37 @@ export const create = mutation({
   handler: async (ctx, args) => ctx.db.insert("paRequests", args),
 });
 
+export const upsertByMrnPortal = mutation({
+  args: {
+    mrn: v.string(),
+    portal: v.string(),
+    medicationOrProcedure: v.string(),
+    status: v.string(),
+    fieldsFilled: v.array(v.string()),
+    gapsDetected: v.array(v.string()),
+    justificationSummary: v.optional(v.string()),
+    submissionId: v.optional(v.string()),
+    gifPath: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("paRequests")
+      .withIndex("by_mrn_portal", (q) =>
+        q.eq("mrn", args.mrn).eq("portal", args.portal)
+      )
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, args);
+      return existing._id;
+    }
+
+    return await ctx.db.insert("paRequests", args);
+  },
+});
+
 export const updateStatus = mutation({
   args: {
     id: v.id("paRequests"),

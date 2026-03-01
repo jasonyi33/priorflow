@@ -364,23 +364,20 @@ async def _complete_run(run_id: str, success: bool, error: Optional[str] = None)
     if convex_client.enabled:
         try:
             convex_doc_id = _convex_run_doc_ids.get(run_id)
-            if not convex_doc_id:
-                return
-            await convex_client.mutation(
-                "agentRuns:complete",
-                {
-                    "id": convex_doc_id,
-                    "completedAt": int(completed_at.timestamp() * 1000),
-                    "stepsTaken": 0,
-                    "success": success,
-                    "errorMessage": error,
-                    "gifPath": None,
-                },
-            )
-            return
+            if convex_doc_id:
+                await convex_client.mutation(
+                    "agentRuns:complete",
+                    {
+                        "id": convex_doc_id,
+                        "completedAt": int(completed_at.timestamp() * 1000),
+                        "stepsTaken": 0,
+                        "success": success,
+                        "errorMessage": error,
+                        "gifPath": None,
+                    },
+                )
         except Exception:
             pass
-
 
 async def _persist_output_file(mrn: str, prefix: str):
     # Read output file and push into Convex via db_client helpers
