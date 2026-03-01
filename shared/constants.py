@@ -28,3 +28,6 @@ STATUS_CHECK_INTERVAL = 3600  # 1 hour between status checks
 # Retry config
 MAX_AGENT_RETRIES = 3
 RETRY_BACKOFF_BASE = 2  # seconds, exponential backoff
+
+# Agent tuning defaults
+DEFAULT_MAX_FAILURES = 5

@@ -48,4 +48,6 @@ def get_sensitive_data() -> dict:
     return {
         "cmm_username": os.getenv("CMM_USERNAME", ""),
         "cmm_password": os.getenv("CMM_PASSWORD", ""),
+        "stedi_email": os.getenv("STEDI_EMAIL", ""),
+        "stedi_password": os.getenv("STEDI_PASSWORD", ""),
     }

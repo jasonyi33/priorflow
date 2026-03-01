@@ -2,11 +2,18 @@
 // Central data hooks for PriorFlow dashboard
 // All metrics are computed from raw data — swap mock API
 // calls for real ones and everything updates automatically.
+//
+// Data source: polls FastAPI REST API every POLL_INTERVAL_MS.
+// When Convex _generated types are available, upgrade to
+// useQuery() for true real-time subscriptions.
 // ═══════════════════════════════════════════════════
 
-import { useState, useEffect, useMemo, createContext, useContext } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, createContext, useContext } from 'react';
 import { api } from './api';
 import { PARequest, AgentRun, Patient } from './types';
+
+// Poll every 5 seconds for near-real-time updates
+const POLL_INTERVAL_MS = 5000;
 
 // ─── CHART DATA (time-series mock — replace with API) ───
 const mockChartData = {
@@ -193,24 +200,48 @@ function computeMetrics(
 }
 
 // ─── THE HOOK ───
+// Polls the backend every POLL_INTERVAL_MS for near-real-time updates.
+// TODO: When convex/_generated types are available, replace with useQuery()
+// subscriptions for true real-time (zero latency) updates.
 export function usePADashboard(): PADashboardData {
   const [paRequests, setPARequests] = useState<PARequest[]>([]);
   const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [pa, runs, pts] = await Promise.all([
+        api.getPARequests(),
+        api.getAgentRuns(),
+        api.getPatients(),
+      ]);
+      if (mountedRef.current) {
+        setPARequests(pa);
+        setAgentRuns(runs);
+        setPatients(pts);
+        setLoading(false);
+      }
+    } catch {
+      // Silently retry on next interval
+    }
+  }, []);
 
   useEffect(() => {
-    Promise.all([
-      api.getPARequests(),
-      api.getAgentRuns(),
-      api.getPatients(),
-    ]).then(([pa, runs, pts]) => {
-      setPARequests(pa);
-      setAgentRuns(runs);
-      setPatients(pts);
-      setLoading(false);
-    });
-  }, []);
+    mountedRef.current = true;
+
+    // Initial fetch
+    fetchData();
+
+    // Poll for updates
+    const interval = setInterval(fetchData, POLL_INTERVAL_MS);
+
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
+  }, [fetchData]);
 
   const computed = useMemo(
     () => computeMetrics(paRequests, agentRuns, patients),
