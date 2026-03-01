@@ -35,6 +35,7 @@ function toPatient(chart: any): Patient {
   // Backend returns full PatientChart objects with nested structure
   if (chart.patient) {
     const mrn = chart.patient.mrn;
+    const createdAt = chart.created_at || chart.createdAt || chart._creationTime;
     return {
       id: mrn,
       name: chart.patient.name,
@@ -42,7 +43,8 @@ function toPatient(chart: any): Patient {
       memberId: chart.insurance.member_id,
       insuranceProvider: chart.insurance.payer,
       chartUrl: `${API_BASE}/patients/${mrn}`,
-      createdAt: toISOString(chart.created_at || chart.createdAt),
+      // Keep deterministic fallback so records do not appear "new" on every poll.
+      createdAt: createdAt ? toISOString(createdAt) : '1970-01-01T00:00:00.000Z',
       providerName: chart.provider?.name,
       providerNpi: chart.provider?.npi,
       practiceName: chart.provider?.practice,
@@ -63,7 +65,7 @@ function toPatient(chart: any): Patient {
     chartUrl: chart.chartJson || chart.mrn ? `${API_BASE}/patients/${mrn}` : undefined,
     createdAt: chart._creationTime
       ? new Date(chart._creationTime).toISOString()
-      : chart.createdAt || new Date().toISOString(),
+      : chart.createdAt || '1970-01-01T00:00:00.000Z',
     providerName: chart.provider?.name,
     providerNpi: chart.provider?.npi,
     practiceName: chart.provider?.practice,

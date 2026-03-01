@@ -29,12 +29,60 @@ def test_get_patient_fixture():
     assert data.get("mrn") == "MRN-00421" or data.get("patient", {}).get("mrn") == "MRN-00421"
 
 
+def test_list_patients_skips_local_fallback_when_convex_enabled_and_query_fails(monkeypatch):
+    import server.routes.patients as patients
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            raise RuntimeError("convex unavailable")
+
+    monkeypatch.setattr(patients, "convex_client", FakeConvexClient())
+
+    resp = client.get("/api/patients")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_get_patient_returns_404_when_convex_enabled_and_not_found(monkeypatch):
+    import server.routes.patients as patients
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            return None
+
+    monkeypatch.setattr(patients, "convex_client", FakeConvexClient())
+
+    resp = client.get("/api/patients/MRN-00421")
+    assert resp.status_code == 404
+
+
 def test_get_eligibility_fixture():
     resp = client.get("/api/eligibility/MRN-00421")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
     assert len(data) > 0
+
+
+def test_get_eligibility_skips_fixture_when_convex_enabled(monkeypatch, tmp_path):
+    import server.routes.eligibility as eligibility
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            return []
+
+    monkeypatch.setattr(eligibility, "convex_client", FakeConvexClient())
+    monkeypatch.setattr(eligibility, "OUTPUT_DIR", tmp_path)
+
+    resp = client.get("/api/eligibility/MRN-00421")
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 def test_pa_list_fixture():

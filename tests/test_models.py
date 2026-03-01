@@ -26,7 +26,7 @@ def test_patient_chart_from_fixture(sample_chart):
     """Verify MRN-00421.json conforms to PatientChart schema."""
     chart = PatientChart(**sample_chart)
     assert chart.patient.mrn == "MRN-00421"
-    assert chart.patient.name == "Jane Doe"
+    assert chart.patient.name == "Alex Morgan"
     assert chart.insurance.payer == "Aetna"
     assert chart.diagnosis.icd10 == "M06.9"
     assert chart.medication is not None

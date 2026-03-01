@@ -49,8 +49,8 @@ async def list_agent_runs(
         except Exception:
             logger.warning("Convex query failed for agentRuns:list", exc_info=True)
 
-    # 3. Fixture fallback (only when nothing else returned data)
-    if not results:
+    # 3. Fixture fallback only in local demo mode.
+    if not results and not convex_client.enabled:
         fixture_file = FIXTURES_DIR / "agent_run_sample.json"
         if fixture_file.exists():
             with open(fixture_file) as f:
