@@ -41,7 +41,6 @@ def _chart_to_convex_args(chart: PatientChart) -> dict:
             "bin": chart.insurance.bin,
             "pcn": chart.insurance.pcn,
             "rxGroup": chart.insurance.rx_group,
-            "planName": chart.insurance.plan_name,
         },
         "diagnosis": {
             "icd10": chart.diagnosis.icd10,
@@ -50,7 +49,6 @@ def _chart_to_convex_args(chart: PatientChart) -> dict:
         "medication": (
             {
                 "name": chart.medication.name,
-                "ndc": chart.medication.ndc,
                 "dose": chart.medication.dose,
                 "frequency": chart.medication.frequency,
             }
@@ -77,6 +75,10 @@ def _chart_to_convex_args(chart: PatientChart) -> dict:
         },
         "chartJson": chart.model_dump_json(),
     }
+    if chart.insurance.plan_name:
+        args["insurance"]["planName"] = chart.insurance.plan_name
+    if chart.medication and chart.medication.ndc:
+        args["medication"]["ndc"] = chart.medication.ndc
     if args.get("medication") is None:
         args.pop("medication")
     if args.get("procedure") is None:
@@ -128,9 +130,9 @@ async def create_patient(chart: PatientChart) -> APIResponse:
 
     if convex_client.enabled:
         try:
-            await convex_client.mutation("patients:create", _chart_to_convex_args(chart))
+            await convex_client.mutation("patients:upsertByMrn", _chart_to_convex_args(chart))
         except Exception:
-            logger.warning("Convex mutation failed for patients:create", exc_info=True)
+            logger.warning("Convex mutation failed for patients:upsertByMrn", exc_info=True)
 
     return APIResponse(
         success=True,

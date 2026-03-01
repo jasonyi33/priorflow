@@ -1,6 +1,7 @@
 """Database client for agents — Convex-first with local file fallback."""
 
 import json
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from tools.chart_loader import load_chart
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+logger = logging.getLogger(__name__)
 
 
 async def save_eligibility_result(result: EligibilityResult) -> bool:
@@ -17,25 +19,31 @@ async def save_eligibility_result(result: EligibilityResult) -> bool:
     saved_to_convex = False
     if convex_client.enabled:
         try:
+            args = {
+                "mrn": payload["mrn"],
+                "portal": payload["portal"],
+                "payer": payload["payer"],
+                "coverageActive": payload["coverage_active"],
+                "paRequired": payload["pa_required"],
+                "checkedAt": _iso_to_ms(payload["checked_at"]),
+            }
+            if payload.get("copay") is not None:
+                args["copay"] = payload["copay"]
+            if payload.get("deductible") is not None:
+                args["deductible"] = payload["deductible"]
+            if payload.get("out_of_pocket_max") is not None:
+                args["outOfPocketMax"] = payload["out_of_pocket_max"]
+            if payload.get("pa_required_reason") is not None:
+                args["paRequiredReason"] = payload["pa_required_reason"]
+            if payload.get("raw_response") is not None:
+                args["rawResponse"] = payload["raw_response"]
             await convex_client.mutation(
                 "eligibilityChecks:create",
-                {
-                    "mrn": payload["mrn"],
-                    "portal": payload["portal"],
-                    "payer": payload["payer"],
-                    "coverageActive": payload["coverage_active"],
-                    "copay": payload.get("copay"),
-                    "deductible": payload.get("deductible"),
-                    "outOfPocketMax": payload.get("out_of_pocket_max"),
-                    "paRequired": payload["pa_required"],
-                    "paRequiredReason": payload.get("pa_required_reason"),
-                    "rawResponse": payload.get("raw_response"),
-                    "checkedAt": _iso_to_ms(payload["checked_at"]),
-                },
+                args,
             )
             saved_to_convex = True
         except Exception:
-            pass
+            logger.warning("Failed to persist eligibility result to Convex", exc_info=True)
 
     if not saved_to_convex:
         _save_local(f"eligibility_{result.mrn}.json", payload)
@@ -111,25 +119,29 @@ def _iso_to_ms(value: str) -> int:
 async def _persist_pa_request_payload(payload: dict) -> None:
     if convex_client.enabled:
         try:
+            args = {
+                "mrn": payload["mrn"],
+                "portal": payload["portal"],
+                "medicationOrProcedure": payload["medication_or_procedure"],
+                "status": payload["status"],
+                "fieldsFilled": payload.get("fields_filled", []),
+                "gapsDetected": payload.get("gaps_detected", []),
+                "createdAt": _iso_to_ms(payload["created_at"]),
+                "updatedAt": _iso_to_ms(payload["updated_at"]),
+            }
+            if payload.get("justification_summary") is not None:
+                args["justificationSummary"] = payload["justification_summary"]
+            if payload.get("submission_id") is not None:
+                args["submissionId"] = payload["submission_id"]
+            if payload.get("gif_path") is not None:
+                args["gifPath"] = payload["gif_path"]
             await convex_client.mutation(
                 "paRequests:upsertByMrnPortal",
-                {
-                    "mrn": payload["mrn"],
-                    "portal": payload["portal"],
-                    "medicationOrProcedure": payload["medication_or_procedure"],
-                    "status": payload["status"],
-                    "fieldsFilled": payload.get("fields_filled", []),
-                    "gapsDetected": payload.get("gaps_detected", []),
-                    "justificationSummary": payload.get("justification_summary"),
-                    "submissionId": payload.get("submission_id"),
-                    "gifPath": payload.get("gif_path"),
-                    "createdAt": _iso_to_ms(payload["created_at"]),
-                    "updatedAt": _iso_to_ms(payload["updated_at"]),
-                },
+                args,
             )
             return
         except Exception:
-            pass
+            logger.warning("Failed to persist PA request to Convex", exc_info=True)
     _save_local(f"pa_submission_{payload['mrn']}.json", payload)
 
 
