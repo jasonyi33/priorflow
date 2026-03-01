@@ -132,7 +132,11 @@ async def create_patient(chart: PatientChart) -> APIResponse:
         try:
             await convex_client.mutation("patients:upsertByMrn", _chart_to_convex_args(chart))
         except Exception:
-            logger.warning("Convex mutation failed for patients:upsertByMrn", exc_info=True)
+            logger.warning("Convex mutation failed for patients:upsertByMrn; trying patients:create", exc_info=True)
+            try:
+                await convex_client.mutation("patients:create", _chart_to_convex_args(chart))
+            except Exception:
+                logger.warning("Convex mutation failed for patients:create", exc_info=True)
 
     return APIResponse(
         success=True,

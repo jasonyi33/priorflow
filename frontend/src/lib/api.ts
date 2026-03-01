@@ -264,23 +264,31 @@ export const api = {
   // Eligibility
   async getEligibilityResults(): Promise<EligibilityResult[]> {
     const patients = await getCachedPatients();
-    const results: EligibilityResult[] = [];
-
-    const fetches = patients.map(async (patient) => {
-      try {
-        const data = await fetchJSON<any[]>(`/eligibility/${patient.id}`);
-        for (const item of data) {
-          results.push(toEligibilityResult(item, patient.name));
+    // Prefer direct list endpoint so eligibility can render even when patients table is sparse.
+    try {
+      const data = await fetchJSON<any[]>('/eligibility');
+      return data
+        .map((item) => toEligibilityResult(item, getPatientName(patients, item.mrn)))
+        .sort((a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime());
+    } catch {
+      // Backward-compatible fallback for older backends without /eligibility list.
+      const results: EligibilityResult[] = [];
+      const fetches = patients.map(async (patient) => {
+        try {
+          const data = await fetchJSON<any[]>(`/eligibility/${patient.id}`);
+          for (const item of data) {
+            results.push(toEligibilityResult(item, patient.name));
+          }
+        } catch {
+          // No eligibility data for this patient
         }
-      } catch {
-        // No eligibility data for this patient
-      }
-    });
+      });
 
-    await Promise.all(fetches);
-    return results.sort(
-      (a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime()
-    );
+      await Promise.all(fetches);
+      return results.sort(
+        (a, b) => new Date(b.checkDate).getTime() - new Date(a.checkDate).getTime()
+      );
+    }
   },
 
   async checkEligibility(patientId: string): Promise<EligibilityResult> {

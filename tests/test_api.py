@@ -68,6 +68,35 @@ def test_get_eligibility_fixture():
     assert len(data) > 0
 
 
+def test_list_eligibility_reads_convex_when_enabled(monkeypatch):
+    import server.routes.eligibility as eligibility
+
+    class FakeConvexClient:
+        enabled = True
+
+        async def query(self, function_name: str, args=None):
+            assert function_name == "eligibilityChecks:list"
+            return [
+                {
+                    "mrn": "MRN-00421",
+                    "portal": "stedi",
+                    "payer": "Aetna",
+                    "coverageActive": True,
+                    "paRequired": True,
+                    "checkedAt": 1740787200000,
+                }
+            ]
+
+    monkeypatch.setattr(eligibility, "convex_client", FakeConvexClient())
+
+    resp = client.get("/api/eligibility")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["mrn"] == "MRN-00421"
+
+
 def test_get_eligibility_skips_fixture_when_convex_enabled(monkeypatch, tmp_path):
     import server.routes.eligibility as eligibility
 

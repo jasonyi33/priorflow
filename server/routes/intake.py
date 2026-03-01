@@ -301,4 +301,8 @@ async def _persist_patient_to_convex(chart: dict[str, Any]) -> None:
             }
         await convex_client.mutation("patients:upsertByMrn", args)
     except Exception:
-        logger.warning("Failed to upsert intake patient to Convex", exc_info=True)
+        logger.warning("Failed to upsert intake patient to Convex; trying patients:create", exc_info=True)
+        try:
+            await convex_client.mutation("patients:create", args)
+        except Exception:
+            logger.warning("Failed to persist intake patient to Convex via patients:create", exc_info=True)

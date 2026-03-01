@@ -23,6 +23,35 @@ FIXTURES_DIR = Path(__file__).parent.parent.parent / "data" / "fixtures"
 OUTPUT_DIR = Path(__file__).parent.parent.parent / "output"
 
 
+@router.get("")
+async def list_eligibility() -> list[dict]:
+    # Convex-first in deployed mode.
+    if convex_client.enabled:
+        try:
+            return await convex_client.query("eligibilityChecks:list")
+        except Exception:
+            logger.warning("Convex query failed for eligibilityChecks:list", exc_info=True)
+            return []
+
+    # Local fallback for dev/demo mode.
+    results: list[dict] = []
+    for output_file in sorted(OUTPUT_DIR.glob("eligibility_*.json"), reverse=True):
+        try:
+            with open(output_file) as f:
+                results.append(json.load(f))
+        except Exception:
+            logger.warning("Failed to read %s", output_file, exc_info=True)
+
+    if results:
+        return results
+
+    fixture_file = FIXTURES_DIR / "eligibility_sample.json"
+    if fixture_file.exists():
+        with open(fixture_file) as f:
+            return [json.load(f)]
+    return []
+
+
 @router.post("/check")
 async def trigger_eligibility_check(req: TriggerEligibilityRequest) -> APIResponse:
     missing = [
