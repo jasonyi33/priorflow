@@ -135,11 +135,22 @@ async def _persist_pa_request_payload(payload: dict) -> None:
                 args["submissionId"] = payload["submission_id"]
             if payload.get("gif_path") is not None:
                 args["gifPath"] = payload["gif_path"]
-            await convex_client.mutation(
-                "paRequests:upsertByMrnPortal",
-                args,
-            )
-            return
+            try:
+                await convex_client.mutation(
+                    "paRequests:upsertByMrnPortal",
+                    args,
+                )
+                return
+            except Exception:
+                logger.warning(
+                    "Failed to upsert PA request in Convex; trying paRequests:create",
+                    exc_info=True,
+                )
+                await convex_client.mutation(
+                    "paRequests:create",
+                    args,
+                )
+                return
         except Exception:
             logger.warning("Failed to persist PA request to Convex", exc_info=True)
     _save_local(f"pa_submission_{payload['mrn']}.json", payload)

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from server.config import settings
 from server.observability import initialize_laminar, shutdown_laminar
+from server.services.convex_client import convex_client
 
 initialize_laminar()
 
@@ -48,7 +49,13 @@ app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "priorflow"}
+    return {
+        "status": "ok",
+        "service": "priorflow",
+        "convexEnabled": convex_client.enabled,
+        "convexUrlConfigured": bool(settings.CONVEX_URL),
+        "convexDeployKeyConfigured": bool(settings.CONVEX_DEPLOY_KEY),
+    }
 
 
 @app.post("/api/webhooks/agentmail")
