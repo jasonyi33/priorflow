@@ -216,10 +216,10 @@ export function Layout() {
     <div className="flex h-full flex-col p-2 gap-2">
       {/* Brand + Collapse toggle */}
       <div className="flex items-center gap-2 px-1 pt-1 pb-1">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <PriorFlowLogo className="size-5" />
+        <div className="flex items-center justify-center rounded-md px-1">
+          <PriorFlowLogo className="h-5 w-auto" />
         </div>
-        <span className="flex-1 text-base font-bold tracking-tight">PriorFlow</span>
+        <span className="flex-1" />
         <button
           onClick={() => setSidebarCollapsed(true)}
           className="flex items-center justify-center size-7 rounded text-muted-foreground/40 hover:text-foreground hover:bg-accent transition-colors"
@@ -661,8 +661,7 @@ export function Layout() {
             <Menu className="size-5" />
           </button>
           <div className="flex items-center gap-2">
-            <PriorFlowMark className="size-5 text-primary" />
-            <span className="text-xs font-semibold tracking-wider">PriorFlow</span>
+            <PriorFlowMark className="h-4 w-auto" />
           </div>
         </header>
 
