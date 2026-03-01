@@ -1,0 +1,48 @@
+{
+  "patient": {
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "dob": "1989-02-03",
+    "gender": "Female"
+  },
+  "insurance": {
+    "payer": "Aetna",
+    "member_id": "A12345",
+    "bin": "610502",
+    "pcn": "ADV",
+    "rx_group": "RX100"
+  },
+  "diagnosis": {
+    "icd10": "M06.9",
+    "description": "Rheumatoid arthritis, unspecified"
+  },
+  "medication": {
+    "name": "Humira",
+    "dose": "40 mg",
+    "frequency": "every 2 weeks",
+    "quantity": "1",
+    "days_supply": "30",
+    "dosage_form": "Kit"
+  },
+  "provider": {
+    "name": "Dr. Sarah Smith",
+    "npi": "1234567890",
+    "phone": "555-555-0100",
+    "fax": "555-555-0401"
+  },
+  "clinical_support": {
+    "prior_therapies": [
+      "Methotrexate",
+      "Sulfasalazine",
+      "Hydroxychloroquine"
+    ],
+    "labs": {},
+    "imaging": {}
+  },
+  "confidence": {},
+  "missing_fields": [],
+  "source": {
+    "minimax_file_id": "local_pdf",
+    "extracted_at": "2026-03-01T11:58:20.517945+00:00"
+  }
+}

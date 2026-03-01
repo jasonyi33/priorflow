@@ -99,31 +99,26 @@ async def dispatch_status_check(mrn: str, portal: Optional[Portal] = None) -> st
     ignore_output=True,
 )
 async def dispatch_full_flow(mrn: str) -> dict:
-    """Run full chain: eligibility -> optional PA -> optional status monitor."""
+    """Run full chain: eligibility + PA submission in parallel, then optional status monitor."""
     elig_run_id = await dispatch_eligibility(mrn)
-    elig_status = await wait_for_run(elig_run_id)
+    pa_run_id = await dispatch_pa_submission(mrn)
 
-    if not elig_status or not elig_status.get("success"):
-        return {
-            "eligibility_run_id": elig_run_id,
-            "pa_run_id": None,
-            "status_run_id": None,
-            "pa_required": None,
-        }
+    elig_status, _ = await asyncio.gather(
+        wait_for_run(elig_run_id),
+        wait_for_run(pa_run_id),
+    )
 
-    pa_required = _read_pa_required(mrn)
-    pa_run_id: Optional[str] = None
     status_run_id: Optional[str] = None
-    if pa_required:
-        pa_run_id = await dispatch_pa_submission(mrn)
-        await wait_for_run(pa_run_id)
-        status_run_id = await dispatch_status_check(mrn)
+    if elig_status and elig_status.get("success"):
+        pa_required = _read_pa_required(mrn)
+        if pa_required:
+            status_run_id = await dispatch_status_check(mrn)
 
     return {
         "eligibility_run_id": elig_run_id,
         "pa_run_id": pa_run_id,
         "status_run_id": status_run_id,
-        "pa_required": pa_required,
+        "pa_required": True,
     }
 
 

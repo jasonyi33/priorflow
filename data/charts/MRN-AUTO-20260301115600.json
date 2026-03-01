@@ -1,0 +1,42 @@
+{
+  "patient": {
+    "name": "Jane Doe",
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "dob": "1989-02-03",
+    "mrn": "MRN-AUTO-20260301115600"
+  },
+  "insurance": {
+    "payer": "Aetna",
+    "member_id": "A12345",
+    "bin": "610502",
+    "pcn": "ADV",
+    "rx_group": "RX100",
+    "plan_name": null
+  },
+  "diagnosis": {
+    "icd10": "M06.9",
+    "description": "Rheumatoid arthritis, unspecified"
+  },
+  "medication": {
+    "name": "Humira",
+    "dose": "40 mg",
+    "frequency": "every 2 weeks",
+    "ndc": null
+  },
+  "procedure": null,
+  "prior_therapies": [
+    "Methotrexate",
+    "Sulfasalazine",
+    "Hydroxychloroquine"
+  ],
+  "labs": {},
+  "imaging": {},
+  "provider": {
+    "name": "Dr. Sarah Smith",
+    "npi": "1234567890",
+    "practice": "Unknown Practice",
+    "phone": "555-555-0100",
+    "fax": "555-555-0401"
+  }
+}
