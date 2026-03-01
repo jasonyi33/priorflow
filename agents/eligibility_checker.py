@@ -21,6 +21,18 @@ from shared.constants import (
     DEFAULT_MAX_STEPS_ELIGIBILITY,
     DEFAULT_MAX_ACTIONS_PER_STEP,
 )
+from server.observability import initialize_laminar
+
+try:
+    from lmnr import Laminar, observe
+except Exception:  # noqa: BLE001
+    Laminar = None  # type: ignore[assignment]
+
+    def observe(**_kwargs):  # type: ignore[no-redef]
+        def _decorator(fn):
+            return fn
+
+        return _decorator
 
 load_dotenv()
 
@@ -55,8 +67,25 @@ async def save_eligibility(mrn: str, result: str) -> ActionResult:
     )
 
 
+@observe(
+    name="agent.eligibility.run",
+    span_type="TOOL",
+    tags=["component:agent", "agent:eligibility", "portal:stedi"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def check_eligibility_stedi(mrn: str):
     """Use Stedi test mode to check eligibility via their web UI."""
+    initialize_laminar()
+    if Laminar and Laminar.is_initialized():
+        Laminar.set_trace_metadata(
+            {
+                "component": "agent",
+                "agent_type": "eligibility",
+                "portal": "stedi",
+            }
+        )
+
     browser_config = get_browser_config()
     browser = Browser(headless=browser_config["headless"])
 

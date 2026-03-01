@@ -7,9 +7,11 @@ import asyncio
 import sys
 
 from agents.eligibility_checker import check_eligibility_stedi
+from server.observability import initialize_laminar, shutdown_laminar
 
 
 async def main():
+    initialize_laminar()
     mrn = sys.argv[1] if len(sys.argv) > 1 else "MRN-00421"
     print(f"Running eligibility check for {mrn}...")
     result = await check_eligibility_stedi(mrn)
@@ -17,4 +19,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        shutdown_laminar()

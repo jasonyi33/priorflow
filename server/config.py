@@ -34,6 +34,9 @@ class Settings:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 
     # Observability
+    LMNR_PROJECT_API_KEY: str = os.getenv("LMNR_PROJECT_API_KEY", "")
+    LMNR_BASE_URL: str = os.getenv("LMNR_BASE_URL", "")
+    # Backward-compatible fallback name.
     LAMINAR_API_KEY: str = os.getenv("LAMINAR_API_KEY", "")
 
 

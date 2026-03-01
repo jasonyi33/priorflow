@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from agents.pa_form_filler import fill_covermymeds_pa
+from server.observability import initialize_laminar, shutdown_laminar
 
 DEMO_MRNS = {
     "MRN-00421": "Humira / Aetna — Jane Doe (RA)",
@@ -58,6 +59,7 @@ async def run_demo(mrn: str):
 
 
 async def main():
+    initialize_laminar()
     args = sys.argv[1:]
 
     if "--all" in args:
@@ -91,4 +93,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        shutdown_laminar()

@@ -11,6 +11,7 @@ from browser_use import Agent, Browser, ChatBrowserUse, Tools, ActionResult
 from dotenv import load_dotenv
 
 from agents.base import get_sensitive_data
+from server.observability import initialize_laminar
 from shared.constants import (
     COVERMYMEDS_URL,
     DEFAULT_MAX_STEPS_STATUS_MONITOR,
@@ -24,6 +25,17 @@ from tools.alert_sender import (
 )
 from tools.db_client import save_status_update
 from datetime import datetime, UTC
+
+try:
+    from lmnr import Laminar, observe
+except Exception:  # noqa: BLE001
+    Laminar = None  # type: ignore[assignment]
+
+    def observe(**_kwargs):  # type: ignore[no-redef]
+        def _decorator(fn):
+            return fn
+
+        return _decorator
 
 load_dotenv()
 
@@ -104,8 +116,25 @@ async def update_status(
     )
 
 
+@observe(
+    name="agent.status_monitor.run",
+    span_type="TOOL",
+    tags=["component:agent", "agent:status_monitor", "portal:covermymeds"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def monitor_covermymeds(mrn: str, patient_name: str):
     """Check CoverMyMeds dashboard for PA determination status."""
+    initialize_laminar()
+    if Laminar and Laminar.is_initialized():
+        Laminar.set_trace_metadata(
+            {
+                "component": "agent",
+                "agent_type": "status_monitor",
+                "portal": "covermymeds",
+            }
+        )
+
     browser = Browser(headless=True)
 
     agent = Agent(

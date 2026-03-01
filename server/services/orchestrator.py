@@ -15,7 +15,19 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Optional, Callable, Awaitable
 
+try:
+    from lmnr import Laminar, observe
+except Exception:  # noqa: BLE001
+    Laminar = None  # type: ignore[assignment]
+
+    def observe(**_kwargs):  # type: ignore[no-redef]
+        def _decorator(fn):
+            return fn
+
+        return _decorator
+
 from shared.models import AgentType, Portal, AgentRun, EligibilityResult, PARequest, PAStatusUpdate
+from server.observability import initialize_laminar
 from server.services.convex_client import convex_client
 from tools import db_client
 from shared.constants import (
@@ -38,6 +50,12 @@ RUN_MAX_STEPS = {
 }
 
 
+@observe(
+    name="orchestrator.dispatch_eligibility",
+    tags=["component:orchestrator", "flow:eligibility"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def dispatch_eligibility(mrn: str, portal: Portal = Portal.STEDI) -> str:
     run_id = f"elig-{mrn}-{int(datetime.now(UTC).timestamp())}"
     await _start_run(run_id, AgentType.ELIGIBILITY, mrn, portal)
@@ -46,6 +64,12 @@ async def dispatch_eligibility(mrn: str, portal: Portal = Portal.STEDI) -> str:
     return run_id
 
 
+@observe(
+    name="orchestrator.dispatch_pa_submission",
+    tags=["component:orchestrator", "flow:pa_submission"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def dispatch_pa_submission(mrn: str, portal: Portal = Portal.COVERMYMEDS) -> str:
     run_id = f"pa-{mrn}-{int(datetime.now(UTC).timestamp())}"
     await _start_run(run_id, AgentType.PA_FORM_FILLER, mrn, portal)
@@ -54,6 +78,12 @@ async def dispatch_pa_submission(mrn: str, portal: Portal = Portal.COVERMYMEDS) 
     return run_id
 
 
+@observe(
+    name="orchestrator.dispatch_status_check",
+    tags=["component:orchestrator", "flow:status_check"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def dispatch_status_check(mrn: str, portal: Optional[Portal] = None) -> str:
     run_id = f"status-{mrn}-{int(datetime.now(UTC).timestamp())}"
     await _start_run(run_id, AgentType.STATUS_MONITOR, mrn, portal or Portal.COVERMYMEDS)
@@ -62,6 +92,12 @@ async def dispatch_status_check(mrn: str, portal: Optional[Portal] = None) -> st
     return run_id
 
 
+@observe(
+    name="orchestrator.dispatch_full_flow",
+    tags=["component:orchestrator", "flow:full_flow"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def dispatch_full_flow(mrn: str) -> dict:
     """Run full chain: eligibility -> optional PA -> optional status monitor."""
     elig_run_id = await dispatch_eligibility(mrn)
@@ -100,6 +136,12 @@ _run_states: dict[str, dict] = {}
 _convex_run_doc_ids: dict[str, str] = {}
 
 
+@observe(
+    name="orchestrator.start_run",
+    tags=["component:orchestrator"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def _start_run(run_id: str, agent_type: AgentType, mrn: str, portal: Portal):
     run = AgentRun(
         id=run_id,
@@ -124,7 +166,24 @@ async def _start_run(run_id: str, agent_type: AgentType, mrn: str, portal: Porta
     await _persist_run(run)
 
 
+@observe(
+    name="orchestrator.run_with_retry",
+    tags=["component:orchestrator"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def _run_with_retry(run_id: str, agent_type: AgentType, mrn: str, portal: Portal, fn: Callable[[str, Portal], Awaitable[None]]):
+    initialize_laminar()
+    if Laminar and Laminar.is_initialized():
+        Laminar.set_trace_session_id(run_id)
+        Laminar.set_trace_metadata(
+            {
+                "component": "orchestrator",
+                "agent_type": agent_type.value,
+                "portal": portal.value,
+                "execution_mode": "live" if ENABLE_AGENT_EXECUTION else "fixture",
+            }
+        )
     attempt = 0
     while attempt < MAX_AGENT_RETRIES:
         try:
@@ -140,6 +199,13 @@ async def _run_with_retry(run_id: str, agent_type: AgentType, mrn: str, portal: 
             await asyncio.sleep(RETRY_BACKOFF_BASE * attempt)
 
 
+@observe(
+    name="orchestrator.run_eligibility",
+    span_type="TOOL",
+    tags=["component:orchestrator", "agent:eligibility"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def _run_eligibility(mrn: str, portal: Portal):
     if ENABLE_AGENT_EXECUTION:
         from agents.eligibility_checker import check_eligibility_stedi
@@ -149,6 +215,13 @@ async def _run_eligibility(mrn: str, portal: Portal):
     await _persist_output_file(mrn, "eligibility")
 
 
+@observe(
+    name="orchestrator.run_pa_submission",
+    span_type="TOOL",
+    tags=["component:orchestrator", "agent:pa_form_filler"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def _run_pa_submission(mrn: str, portal: Portal):
     if ENABLE_AGENT_EXECUTION:
         from agents.pa_form_filler import fill_covermymeds_pa
@@ -158,6 +231,13 @@ async def _run_pa_submission(mrn: str, portal: Portal):
     await _persist_output_file(mrn, "pa_submission")
 
 
+@observe(
+    name="orchestrator.run_status_check",
+    span_type="TOOL",
+    tags=["component:orchestrator", "agent:status_monitor"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def _run_status_check(mrn: str, portal: Portal):
     if ENABLE_AGENT_EXECUTION:
         from agents.status_monitor import monitor_covermymeds

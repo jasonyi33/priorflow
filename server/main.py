@@ -9,6 +9,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.config import settings
+from server.observability import initialize_laminar, shutdown_laminar
+
+initialize_laminar()
+
 from server.routes import patients, eligibility, pa_requests, agents
 
 app = FastAPI(
@@ -38,3 +42,8 @@ app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "service": "priorflow"}
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    shutdown_laminar()

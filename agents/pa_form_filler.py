@@ -19,12 +19,24 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from agents.base import load_chart, save_output, get_sensitive_data
+from server.observability import initialize_laminar
 from shared.constants import (
     COVERMYMEDS_URL,
     COVERMYMEDS_KEY_URL,
     DEFAULT_MAX_STEPS_PA_FILLER,
     DEFAULT_MAX_ACTIONS_PER_STEP,
 )
+
+try:
+    from lmnr import Laminar, observe
+except Exception:  # noqa: BLE001
+    Laminar = None  # type: ignore[assignment]
+
+    def observe(**_kwargs):  # type: ignore[no-redef]
+        def _decorator(fn):
+            return fn
+
+        return _decorator
 
 load_dotenv()
 
@@ -146,6 +158,13 @@ Click "Send To Prescriber" (NOT "Send To Plan").
 """
 
 
+@observe(
+    name="agent.pa_form_filler.run",
+    span_type="TOOL",
+    tags=["component:agent", "agent:pa_form_filler", "portal:covermymeds"],
+    ignore_input=True,
+    ignore_output=True,
+)
 async def fill_covermymeds_pa(mrn: str):
     """Drive the CoverMyMeds portal to submit a prior authorization.
 
@@ -153,6 +172,16 @@ async def fill_covermymeds_pa(mrn: str):
     Flow: Login → New Request → Enter med + demographics → Select form →
     Fill Caremark ePA fields → Send To Prescriber.
     """
+    initialize_laminar()
+    if Laminar and Laminar.is_initialized():
+        Laminar.set_trace_metadata(
+            {
+                "component": "agent",
+                "agent_type": "pa_form_filler",
+                "portal": "covermymeds",
+            }
+        )
+
     # Pre-load chart data
     chart = load_chart(mrn)
     sensitive = get_sensitive_data()

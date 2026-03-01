@@ -11,9 +11,11 @@ from pathlib import Path
 from agents.eligibility_checker import check_eligibility_stedi
 from agents.pa_form_filler import fill_covermymeds_pa
 from agents.status_monitor import monitor_covermymeds
+from server.observability import initialize_laminar, shutdown_laminar
 
 
 async def main():
+    initialize_laminar()
     mrn = sys.argv[1] if len(sys.argv) > 1 else "MRN-00421"
 
     # Load patient name for status monitor
@@ -49,4 +51,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        shutdown_laminar()
