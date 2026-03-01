@@ -257,11 +257,6 @@ async def _run_eligibility(mrn: str, portal: Portal):
     run_id = next((rid for rid, s in _run_states.items() if s["mrn"] == mrn and s["agent_type"] == "eligibility" and s["status"] in ("started", "retrying")), None)
     if run_id:
         _log_step(run_id, "Loading patient chart data")
-    await db_client.ensure_pa_request_entry(
-        mrn=mrn, portal=Portal.COVERMYMEDS,
-        status=PAStatusEnum.CHECKING_ELIGIBILITY,
-        updated_at=datetime.now(UTC).isoformat(),
-    )
     if _is_live_execution(AgentType.ELIGIBILITY):
         from agents.eligibility_checker import check_eligibility_stedi
         if run_id:

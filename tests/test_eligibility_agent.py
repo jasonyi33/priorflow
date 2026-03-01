@@ -131,11 +131,6 @@ async def test_save_eligibility_result(tmp_path, monkeypatch):
     assert saved["mrn"] == "MRN-00421"
     assert saved["pa_required"] is True
 
+    # Eligibility save should NOT create a PA request entry as a side effect
     pa_output_file = tmp_path / "pa_submission_MRN-00421.json"
-    assert pa_output_file.exists()
-    with open(pa_output_file) as f:
-        pa_saved = json.load(f)
-    assert pa_saved["mrn"] == "MRN-00421"
-    assert pa_saved["status"] == "pending"
-    assert pa_saved["portal"] == "covermymeds"
-    assert pa_saved["medication_or_procedure"] == "Humira 40mg"
+    assert not pa_output_file.exists()

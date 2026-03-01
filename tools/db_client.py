@@ -48,12 +48,6 @@ async def save_eligibility_result(result: EligibilityResult) -> bool:
     if not saved_to_convex:
         _save_local(f"eligibility_{result.mrn}.json", payload)
 
-    await ensure_pa_request_entry(
-        mrn=result.mrn,
-        portal=Portal.COVERMYMEDS,
-        status=PAStatusEnum.PENDING,
-        updated_at=payload["checked_at"],
-    )
     return True
 
 
