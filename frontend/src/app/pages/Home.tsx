@@ -305,7 +305,7 @@ export function Home() {
   const [uploading, setUploading] = useState(false);
   const [trackerRefreshing, setTrackerRefreshing] = useState(false);
   const [intakeSessions, setIntakeSessions] = useState<IntakeSessionTrace[]>([]);
-  const sessionPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const sessionPollersRef = useRef<Record<string, number>>({});
 
   const stopSessionPolling = useCallback((sessionId: string) => {
     const timer = sessionPollersRef.current[sessionId];
